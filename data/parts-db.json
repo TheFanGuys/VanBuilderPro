@@ -1,0 +1,1711 @@
+{
+  "schema": "parts_db@2 (Van Parts DB / Spec \u00a75.2, extended)",
+  "generated": "2026-06-15",
+  "units": {
+    "length": "in",
+    "weight": "lb",
+    "cost": "usd",
+    "power": "W",
+    "current": "A"
+  },
+  "count": 33,
+  "systems": [
+    "appliance",
+    "cabinetry",
+    "electrical",
+    "hvac",
+    "plumbing",
+    "tank"
+  ],
+  "components": [
+    {
+      "system": "electrical",
+      "category": "Battery",
+      "brand": "Battle Born",
+      "model": "2\u00d7 BB10012",
+      "dims": {
+        "l": 27,
+        "w": 13,
+        "h": 9
+      },
+      "weightLb": 62,
+      "costUsd": 1750,
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 200,
+        "peakAmps": 400,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 125,
+        "fuseType": "Class-T",
+        "minWireAwg": "2 AWG",
+        "comms": "BT",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 200,
+        "unit": "Ah",
+        "kind": "Battery capacity"
+      },
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "strap / hold-down",
+        "clearanceIn": 2,
+        "orientation": "upright",
+        "notes": "Class-T main fuse within 7\" of the positive terminal. Strap down; no venting needed for LiFePO4."
+      },
+      "sources": [
+        {
+          "label": "Battle Born BB10012 spec",
+          "url": "https://battlebornbatteries.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": true,
+      "tags": [
+        "lithium",
+        "house bank"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-bb-200",
+      "name": "LiFePO4 battery bank (2\u00d7100Ah)",
+      "missing": [],
+      "placeable": true,
+      "needsReview": false
+    },
+    {
+      "system": "electrical",
+      "category": "Inverter/Charger",
+      "brand": "Victron",
+      "model": "PMP122200000",
+      "dims": {
+        "l": 16,
+        "w": 8,
+        "h": 8
+      },
+      "weightLb": 23,
+      "costUsd": 760,
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 167,
+        "peakAmps": 350,
+        "surgeWatts": 4000,
+        "idleWatts": 8,
+        "dailyAh": null,
+        "recommendedFuseA": 250,
+        "fuseType": "Class-T",
+        "minWireAwg": "2/0 AWG",
+        "comms": "VE.Bus",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": 2000,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 2000,
+        "unit": "W",
+        "kind": "Continuous output"
+      },
+      "mounting": {
+        "surface": "wall/floor",
+        "fasteners": "lag into frame",
+        "clearanceIn": 4,
+        "orientation": "vertical",
+        "notes": "Mount near the bank for short DC runs. AC output to a GFCI sub-panel; bond neutral\u2013ground per code."
+      },
+      "sources": [
+        {
+          "label": "Victron MultiPlus datasheet",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": true,
+      "tags": [
+        "inverter",
+        "shore charging"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-mp-2000",
+      "name": "MultiPlus 12/2000 inverter/charger",
+      "missing": [],
+      "placeable": true,
+      "needsReview": false
+    },
+    {
+      "system": "electrical",
+      "category": "Charge Controller",
+      "brand": "Victron",
+      "model": "SCC110050210",
+      "dims": {
+        "l": 8,
+        "w": 6,
+        "h": 5
+      },
+      "weightLb": 6,
+      "costUsd": 290,
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 50,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 60,
+        "fuseType": "MEGA",
+        "minWireAwg": "6 AWG",
+        "comms": "VE.Direct",
+        "switchedBy": "none",
+        "terminals": "ferrule",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 700,
+        "unit": "W",
+        "kind": "Max solar (12V)"
+      },
+      "mounting": {
+        "surface": "wall",
+        "fasteners": "screws into frame",
+        "clearanceIn": 6,
+        "orientation": "vertical",
+        "notes": "Airflow above/below. Battery side fused; connect battery first, then PV."
+      },
+      "sources": [
+        {
+          "label": "Victron MPPT page",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": true,
+      "tags": [
+        "solar",
+        "mppt"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-mppt-10050",
+      "name": "SmartSolar MPPT 100/50",
+      "missing": [],
+      "placeable": true,
+      "needsReview": false
+    },
+    {
+      "system": "electrical",
+      "category": "Solar Panel",
+      "brand": "Renogy",
+      "model": "RNG-200D",
+      "dims": {
+        "l": 59,
+        "w": 26,
+        "h": 1.4
+      },
+      "weightLb": 27,
+      "costUsd": 230,
+      "electrical": {
+        "role": "source",
+        "voltage": "N/A",
+        "contAmps": null,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "10 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "MC4",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 200,
+        "unit": "W",
+        "kind": "Rated output"
+      },
+      "mounting": {
+        "surface": "roof",
+        "fasteners": "Z-bracket / rail feet",
+        "clearanceIn": null,
+        "orientation": "flat",
+        "notes": "Bed bracket feet in lap sealant. One cable gland for the roof penetration."
+      },
+      "sources": [
+        {
+          "label": "Renogy product page",
+          "url": "https://www.renogy.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": false,
+      "tags": [
+        "solar",
+        "roof-mount"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-rng-200",
+      "name": "200W solar panel",
+      "missing": [
+        "electrical.contAmps",
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "electrical",
+      "category": "DC-DC Charger",
+      "brand": "Victron",
+      "model": "ORI121236120",
+      "dims": {
+        "l": 9,
+        "w": 5,
+        "h": 3
+      },
+      "weightLb": 3.3,
+      "costUsd": 215,
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 30,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 50,
+        "fuseType": "MEGA",
+        "minWireAwg": "6 AWG",
+        "comms": "VE.Direct",
+        "switchedBy": "none",
+        "terminals": "ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 30,
+        "unit": "Ah",
+        "kind": "Charge current"
+      },
+      "mounting": {
+        "surface": "wall/floor",
+        "fasteners": "screws into frame",
+        "clearanceIn": 2,
+        "orientation": "any",
+        "notes": "Between starter and house battery. Fuse BOTH ends; run + and \u2212 the full distance."
+      },
+      "sources": [
+        {
+          "label": "Victron Orion-Tr",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": true,
+      "tags": [
+        "alternator",
+        "b2b"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-orion-30",
+      "name": "Orion-Tr 12/12-30 DC-DC charger",
+      "missing": [],
+      "placeable": true,
+      "needsReview": false
+    },
+    {
+      "system": "electrical",
+      "category": "Fuse Block",
+      "brand": "Blue Sea",
+      "model": "5026",
+      "dims": {
+        "l": 7,
+        "w": 3.4,
+        "h": 1.4
+      },
+      "weightLb": 0.7,
+      "costUsd": 55,
+      "electrical": {
+        "role": "distribution",
+        "voltage": "12V",
+        "contAmps": 100,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": "blade",
+        "minWireAwg": "8 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "ring + blade",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 12,
+        "unit": "",
+        "kind": "Circuits"
+      },
+      "mounting": {
+        "surface": "wall",
+        "fasteners": "screws",
+        "clearanceIn": 1,
+        "orientation": "any",
+        "notes": "Accessible, covered. Common negative bus included; label every circuit."
+      },
+      "sources": [
+        {
+          "label": "Blue Sea 5026",
+          "url": "https://www.bluesea.com"
+        }
+      ],
+      "confidence": "verified",
+      "verified": true,
+      "tags": [
+        "distribution"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-fuse-12",
+      "name": "12-circuit fuse block",
+      "missing": [
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "appliance",
+      "category": "Refrigerator",
+      "brand": "Dometic",
+      "model": "CFX3 45",
+      "dims": {
+        "l": 28,
+        "w": 19,
+        "h": 18
+      },
+      "weightLb": 43,
+      "costUsd": 900,
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 4,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 50,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "12 AWG",
+        "comms": "none",
+        "switchedBy": "always-hot",
+        "terminals": "blade",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 1.6,
+        "unit": "cu_ft",
+        "kind": "Fridge interior"
+      },
+      "mounting": {
+        "surface": "floor/cabinet",
+        "fasteners": "cabinet straps",
+        "clearanceIn": 2,
+        "orientation": "upright",
+        "notes": "Own circuit from the fuse block. Allow compressor airflow."
+      },
+      "sources": [
+        {
+          "label": "Dometic CFX3 45 (corrected from overview; confirm on datasheet)",
+          "url": "https://www.dometic.com"
+        }
+      ],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "fridge"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "ap-fridge-45",
+      "name": "12V compressor fridge",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "appliance",
+      "category": "Cooktop",
+      "brand": "Generic",
+      "model": "IND-1800",
+      "dims": {
+        "l": 14,
+        "w": 12,
+        "h": 3
+      },
+      "weightLb": 8,
+      "costUsd": 120,
+      "electrical": {
+        "role": "load",
+        "voltage": "120V",
+        "contAmps": 13,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "AC-panel",
+        "terminals": "plug",
+        "inverterW": null,
+        "runWatts": 1500
+      },
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "countertop",
+        "fasteners": "drop-in or portable",
+        "clearanceIn": 4,
+        "orientation": "flat",
+        "notes": "Needs inverter or shore. Confirm draw; some pull 1800W on boost."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "galley",
+        "ac-load"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "ap-induction",
+      "name": "Induction cooktop (single)",
+      "missing": [
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "hvac",
+      "category": "Roof Fan",
+      "brand": "Maxxair",
+      "model": "Deluxe 7500K",
+      "dims": {
+        "l": 16,
+        "w": 16,
+        "h": 4
+      },
+      "weightLb": 12,
+      "costUsd": 300,
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 15,
+        "recommendedFuseA": 7.5,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "STAR",
+        "terminals": "blade",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "roof",
+        "fasteners": "14\u00d714 cutout + butyl",
+        "clearanceIn": null,
+        "orientation": "flat",
+        "notes": "Switched circuit. Lap-seal the flange."
+      },
+      "sources": [
+        {
+          "label": "Maxxair datasheet",
+          "url": "https://www.maxxair.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": true,
+      "tags": [
+        "ventilation",
+        "roof"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "hv-fan-7500",
+      "name": "Roof fan",
+      "missing": [],
+      "placeable": true,
+      "needsReview": false
+    },
+    {
+      "system": "hvac",
+      "category": "Air Conditioner",
+      "brand": "Dometic",
+      "model": "Penguin II",
+      "dims": {
+        "l": 30,
+        "w": 20,
+        "h": 14
+      },
+      "weightLb": 70,
+      "costUsd": 1200,
+      "electrical": {
+        "role": "load",
+        "voltage": "120V",
+        "contAmps": 13,
+        "peakAmps": 24,
+        "surgeWatts": 2900,
+        "idleWatts": null,
+        "dailyAh": 150,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "AC-panel",
+        "terminals": "screw",
+        "inverterW": null,
+        "runWatts": 1500
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 13500,
+        "unit": "BTU",
+        "kind": "Cooling"
+      },
+      "mounting": {
+        "surface": "roof",
+        "fasteners": "14\u00d714 cutout + gasket",
+        "clearanceIn": null,
+        "orientation": "flat",
+        "notes": "Own 15A AC branch. Needs inverter or shore; a soft-start tames the surge."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "cooling",
+        "roof",
+        "ac-load"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "hv-ac-penguin",
+      "name": "Roof air conditioner",
+      "missing": [
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "hvac",
+      "category": "Heater",
+      "brand": "Espar",
+      "model": "Airtronic B4",
+      "dims": {
+        "l": 12,
+        "w": 6,
+        "h": 6
+      },
+      "weightLb": 12,
+      "costUsd": 200,
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 10,
+        "surgeWatts": 110,
+        "idleWatts": null,
+        "dailyAh": 5,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "STAR",
+        "terminals": "blade",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 13600,
+        "unit": "BTU",
+        "kind": "Heat output"
+      },
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "bracket + tank",
+        "clearanceIn": 3,
+        "orientation": "flat",
+        "notes": "Glow-plug inrush at start; fuse near source. Exhaust vents fully outside (CO risk)."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "heat",
+        "diesel"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "hv-heater-d4",
+      "name": "Diesel air heater",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "tank",
+      "category": "Fresh Tank",
+      "brand": "Generic",
+      "model": "FW-25",
+      "dims": {
+        "l": 30,
+        "w": 14,
+        "h": 12
+      },
+      "weightLb": 18,
+      "costUsd": 150,
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 0.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": 25,
+        "fluid": "fresh"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "floor/wheel-well",
+        "fasteners": "straps to frame",
+        "clearanceIn": 1,
+        "orientation": "level",
+        "notes": "Mount low and centered for ballast. Fill port + vent."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "water",
+        "tank"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-fresh-25",
+      "name": "Fresh water tank (25 gal)",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "tank",
+      "category": "Gray Tank",
+      "brand": "Generic",
+      "model": "GW-20",
+      "dims": {
+        "l": 28,
+        "w": 14,
+        "h": 10
+      },
+      "weightLb": 16,
+      "costUsd": 130,
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 1.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": 20,
+        "fluid": "gray"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "under-floor/floor",
+        "fasteners": "straps",
+        "clearanceIn": 1,
+        "orientation": "level",
+        "notes": "Slope to the dump valve. Vent above."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "water",
+        "tank"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-gray-20",
+      "name": "Gray water tank (20 gal)",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "plumbing",
+      "category": "Water Pump",
+      "brand": "Shurflo",
+      "model": "4008",
+      "dims": {
+        "l": 9,
+        "w": 5,
+        "h": 5
+      },
+      "weightLb": 4,
+      "costUsd": 90,
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 7,
+        "peakAmps": 10,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "always-hot",
+        "terminals": "blade",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": 3.0,
+        "connectionSizeIn": 0.5,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "fresh"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "screws + rubber feet",
+        "clearanceIn": 1,
+        "orientation": "any",
+        "notes": "Powered device: bought here, wired in the electrical BOM. Accumulator smooths flow."
+      },
+      "sources": [
+        {
+          "label": "Shurflo 4008",
+          "url": "https://www.shurflo.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": false,
+      "tags": [
+        "water",
+        "powered"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-pump",
+      "name": "Water pump (12V)",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "plumbing",
+      "category": "Water Heater",
+      "brand": "Generic",
+      "model": "CAL-10L",
+      "dims": {
+        "l": 16,
+        "w": 12,
+        "h": 12
+      },
+      "weightLb": 22,
+      "costUsd": 450,
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 0.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": 2.6,
+        "fluid": "hot_water"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "floor/cabinet",
+        "fasteners": "bracket",
+        "clearanceIn": 2,
+        "orientation": "upright",
+        "notes": "Heat exchanger off the diesel hydronic loop. No direct power."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "hot water",
+        "hydronic"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-heater-cal",
+      "name": "Hydronic calorifier (hot water)",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "plumbing",
+      "category": "Sink",
+      "brand": "Generic",
+      "model": "SINK-15",
+      "dims": {
+        "l": 15,
+        "w": 13,
+        "h": 7
+      },
+      "weightLb": 9,
+      "costUsd": 140,
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": 1.5,
+        "connectionSizeIn": 0.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "fresh"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "countertop",
+        "fasteners": "drop-in clips",
+        "clearanceIn": 2,
+        "orientation": "level",
+        "notes": "Drains to gray. Pair with a hand pump or the 12V pump."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "galley"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-sink",
+      "name": "Galley sink + faucet",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "plumbing",
+      "category": "Shower",
+      "brand": "Generic",
+      "model": "FRP-3232",
+      "dims": {
+        "l": 32,
+        "w": 32,
+        "h": 78
+      },
+      "weightLb": 90,
+      "costUsd": 700,
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": 1.8,
+        "connectionSizeIn": 0.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "fresh"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "sealed to floor + wall frame",
+        "clearanceIn": null,
+        "orientation": "upright",
+        "notes": "Drain to gray. Tall unit \u2014 check interior roof height."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "wet bath"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-shower",
+      "name": "Shower pan + walls",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "plumbing",
+      "category": "Valve",
+      "brand": "Generic",
+      "model": "MV-1",
+      "dims": {
+        "l": 4,
+        "w": 3,
+        "h": 3
+      },
+      "weightLb": 1,
+      "costUsd": 70,
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 1,
+        "peakAmps": 3,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 5,
+        "fuseType": "blade",
+        "minWireAwg": "16 AWG",
+        "comms": "none",
+        "switchedBy": "IO-Ext",
+        "terminals": "ferrule",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 1.5,
+        "powered": true,
+        "valveType": "electric",
+        "tankGal": null,
+        "fluid": "gray"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "tank outlet",
+        "fasteners": "thread-on",
+        "clearanceIn": 1,
+        "orientation": "any",
+        "notes": "Motorized ball valve. Counts against STAR/IO-Extender channels."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "powered",
+        "drain"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-valve-elec",
+      "name": "Electric drain valve",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "cabinetry",
+      "category": "Bed",
+      "brand": "Custom",
+      "model": "BED-PLAT",
+      "dims": {
+        "l": 74,
+        "w": 54,
+        "h": 14
+      },
+      "weightLb": 120,
+      "costUsd": 350,
+      "electrical": null,
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "frame",
+        "fasteners": "t-nuts into 10-series",
+        "clearanceIn": null,
+        "orientation": "flat",
+        "notes": "3/4\" ply deck + slats on a t-slot frame. Often spans rear width."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "sleep"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "cb-bed",
+      "name": "Bed platform",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "cabinetry",
+      "category": "Cabinet",
+      "brand": "Custom",
+      "model": "GALLEY-40",
+      "dims": {
+        "l": 40,
+        "w": 24,
+        "h": 36
+      },
+      "weightLb": 110,
+      "costUsd": 600,
+      "electrical": null,
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "floor/frame",
+        "fasteners": "screws + t-nuts",
+        "clearanceIn": null,
+        "orientation": "upright",
+        "notes": "3/4\" birch carcass, butcher top, drawer slides, sink cutout."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "galley"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "cb-galley",
+      "name": "Galley cabinet",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "cabinetry",
+      "category": "Seating",
+      "brand": "Custom",
+      "model": "BENCH-44",
+      "dims": {
+        "l": 44,
+        "w": 18,
+        "h": 18
+      },
+      "weightLb": 70,
+      "costUsd": 300,
+      "electrical": null,
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "floor/frame",
+        "fasteners": "screws",
+        "clearanceIn": null,
+        "orientation": "upright",
+        "notes": "Hinged-lid storage box + cushions. Rated belts if used as seating."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "seat",
+        "storage"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "cb-bench",
+      "name": "Bench seat",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "cabinetry",
+      "category": "Cabinet",
+      "brand": "Custom",
+      "model": "UPPER-36",
+      "dims": {
+        "l": 36,
+        "w": 12,
+        "h": 14
+      },
+      "weightLb": 40,
+      "costUsd": 350,
+      "electrical": null,
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "wall",
+        "fasteners": "t-nuts into wall frame",
+        "clearanceIn": null,
+        "orientation": "wall",
+        "notes": "Wall-hung ply cabinet w/ doors. Tie into the t-slot uprights."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "storage"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "cb-upper",
+      "name": "Upper cabinet",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "cabinetry",
+      "category": "Storage",
+      "brand": "Custom",
+      "model": "BOX-24",
+      "dims": {
+        "l": 24,
+        "w": 18,
+        "h": 16
+      },
+      "weightLb": 25,
+      "costUsd": 120,
+      "electrical": null,
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "straps",
+        "clearanceIn": null,
+        "orientation": "any",
+        "notes": "Secured ply or poly box."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "storage"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "cb-box",
+      "name": "Storage box",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "electrical",
+      "category": "Battery",
+      "brand": "Battle Born",
+      "model": "BB10012",
+      "dims": {
+        "l": 12.75,
+        "w": 6.875,
+        "h": 9
+      },
+      "weightLb": 31,
+      "costUsd": 875,
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 100,
+        "peakAmps": 200,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 100,
+        "fuseType": "Class-T",
+        "minWireAwg": "4 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 100,
+        "unit": "Ah",
+        "kind": "Battery capacity"
+      },
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "strap / hold-down",
+        "clearanceIn": 2,
+        "orientation": "upright",
+        "notes": "Group-27 footprint. No venting (LiFePO4)."
+      },
+      "sources": [
+        {
+          "label": "Battle Born BB10012",
+          "url": "https://battlebornbatteries.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": true,
+      "tags": [
+        "lithium",
+        "single"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-bb-100",
+      "name": "LiFePO4 battery (100Ah)",
+      "missing": [],
+      "placeable": true,
+      "needsReview": false
+    },
+    {
+      "system": "electrical",
+      "category": "Busbar",
+      "brand": "Victron",
+      "model": "LYN060102000",
+      "dims": {
+        "l": 12,
+        "w": 7,
+        "h": 4
+      },
+      "weightLb": 4,
+      "costUsd": 170,
+      "electrical": {
+        "role": "distribution",
+        "voltage": "12V",
+        "contAmps": 1000,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": "MEGA",
+        "minWireAwg": "2/0 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "wall",
+        "fasteners": "screws into frame",
+        "clearanceIn": 2,
+        "orientation": "any",
+        "notes": "Modular +/- bus. \u22641000A bus; MEGA fuse per branch. Keep runs short."
+      },
+      "sources": [
+        {
+          "label": "Victron Lynx",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": false,
+      "tags": [
+        "distribution",
+        "busbar"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-lynx",
+      "name": "Lynx Distributor (busbar)",
+      "missing": [
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "electrical",
+      "category": "Monitor",
+      "brand": "Victron",
+      "model": "SmartShunt 500A",
+      "dims": {
+        "l": 4,
+        "w": 3,
+        "h": 2
+      },
+      "weightLb": 0.6,
+      "costUsd": 130,
+      "electrical": {
+        "role": "monitor",
+        "voltage": "12V",
+        "contAmps": null,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "2/0 AWG",
+        "comms": "BT/VE.Direct",
+        "switchedBy": "none",
+        "terminals": "M10 stud",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "battery negative",
+        "fasteners": "inline on main \u2212",
+        "clearanceIn": 1,
+        "orientation": "any",
+        "notes": "Sits on the main negative; all loads return through it."
+      },
+      "sources": [
+        {
+          "label": "Victron SmartShunt",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": false,
+      "tags": [
+        "monitor"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-shunt",
+      "name": "Battery monitor / shunt",
+      "missing": [
+        "electrical.contAmps",
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "electrical",
+      "category": "AC Inlet",
+      "brand": "Marinco",
+      "model": "6373EL-B",
+      "dims": {
+        "l": 5,
+        "w": 5,
+        "h": 3
+      },
+      "weightLb": 1.5,
+      "costUsd": 60,
+      "electrical": {
+        "role": "distribution",
+        "voltage": "120V",
+        "contAmps": 30,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "10 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "screw",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "exterior wall",
+        "fasteners": "4 screws + sealant",
+        "clearanceIn": 1,
+        "orientation": "flush",
+        "notes": "Feeds the AC sub-panel main breaker. Weatherproof gasket."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "ac",
+        "shore"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "el-shore-30",
+      "name": "Shore power inlet (30A)",
+      "missing": [
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "hvac",
+      "category": "Air Conditioner",
+      "brand": "Generic",
+      "model": "DC-5000",
+      "dims": {
+        "l": 32,
+        "w": 16,
+        "h": 11
+      },
+      "weightLb": 42,
+      "costUsd": 1500,
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 45,
+        "peakAmps": 60,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 200,
+        "recommendedFuseA": 60,
+        "fuseType": "MEGA",
+        "minWireAwg": "6 AWG",
+        "comms": "none",
+        "switchedBy": "STAR",
+        "terminals": "ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "capacity": {
+        "value": 5000,
+        "unit": "BTU",
+        "kind": "Cooling"
+      },
+      "mounting": {
+        "surface": "floor/under-bed",
+        "fasteners": "bracket",
+        "clearanceIn": 4,
+        "orientation": "level",
+        "notes": "Runs straight off 12V \u2014 no inverter. Big DC draw; size wire/fuse carefully."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "cooling",
+        "dc"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "hv-dc-ac",
+      "name": "12V DC air conditioner",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "plumbing",
+      "category": "Toilet",
+      "brand": "Nature's Head",
+      "model": "NH-STD",
+      "dims": {
+        "l": 20,
+        "w": 19,
+        "h": 20
+      },
+      "weightLb": 28,
+      "costUsd": 1000,
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 0.1,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 2,
+        "fuseType": "blade",
+        "minWireAwg": "18 AWG",
+        "comms": "none",
+        "switchedBy": "always-hot",
+        "terminals": "blade",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": null,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "waste"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "2 floor brackets",
+        "clearanceIn": 2,
+        "orientation": "upright",
+        "notes": "Tiny 12V vent fan. Vent hose to exterior. No black tank."
+      },
+      "sources": [
+        {
+          "label": "Nature's Head",
+          "url": "https://natureshead.net"
+        }
+      ],
+      "confidence": "manufacturer",
+      "verified": false,
+      "tags": [
+        "toilet",
+        "waste"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-toilet",
+      "name": "Composting toilet",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "tank",
+      "category": "Fresh Tank",
+      "brand": "Generic",
+      "model": "FW-40",
+      "dims": {
+        "l": 36,
+        "w": 16,
+        "h": 14
+      },
+      "weightLb": 26,
+      "costUsd": 200,
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 0.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": 40,
+        "fluid": "fresh"
+      },
+      "capacity": null,
+      "mounting": {
+        "surface": "floor",
+        "fasteners": "straps to frame",
+        "clearanceIn": 1,
+        "orientation": "level",
+        "notes": "Heavy when full (~330 lb). Mount low + centered for ballast."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "water",
+        "tank"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "pl-fresh-40",
+      "name": "Fresh water tank (40 gal)",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "appliance",
+      "category": "Microwave",
+      "brand": "Generic",
+      "model": "MW-700",
+      "dims": {
+        "l": 18,
+        "w": 14,
+        "h": 11
+      },
+      "weightLb": 25,
+      "costUsd": 110,
+      "electrical": {
+        "role": "load",
+        "voltage": "120V",
+        "contAmps": 8,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "AC-panel",
+        "terminals": "plug",
+        "inverterW": null,
+        "runWatts": 900
+      },
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "cabinet",
+        "fasteners": "secured in cabinet",
+        "clearanceIn": 2,
+        "orientation": "upright",
+        "notes": "Needs inverter or shore. Surge on start; confirm inverter handles it."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "galley",
+        "ac-load"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "ap-microwave",
+      "name": "Microwave (700W)",
+      "missing": [
+        "electrical.recommendedFuseA"
+      ],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "cabinetry",
+      "category": "Seating",
+      "brand": "Generic",
+      "model": "SWIVEL-1",
+      "dims": {
+        "l": 18,
+        "w": 18,
+        "h": 4
+      },
+      "weightLb": 18,
+      "costUsd": 250,
+      "electrical": null,
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "seat pedestal",
+        "fasteners": "bolt to factory seat box",
+        "clearanceIn": null,
+        "orientation": "level",
+        "notes": "Lets a cab seat rotate into the living space. Vehicle-specific bracket."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "seat"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "cb-swivel",
+      "name": "Swivel seat base",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    },
+    {
+      "system": "cabinetry",
+      "category": "Storage",
+      "brand": "Custom",
+      "model": "GARAGE-36",
+      "dims": {
+        "l": 36,
+        "w": 16,
+        "h": 40
+      },
+      "weightLb": 35,
+      "costUsd": 200,
+      "electrical": null,
+      "plumbing": null,
+      "capacity": null,
+      "mounting": {
+        "surface": "frame",
+        "fasteners": "t-nuts into 10-series",
+        "clearanceIn": null,
+        "orientation": "upright",
+        "notes": "Under-bed gear garage. Ties into the t-slot frame."
+      },
+      "sources": [],
+      "confidence": "estimated",
+      "verified": false,
+      "tags": [
+        "storage",
+        "garage"
+      ],
+      "updatedAt": "2026-06-14",
+      "id": "cb-shelf",
+      "name": "Garage shelving",
+      "missing": [],
+      "placeable": true,
+      "needsReview": true
+    }
+  ]
+}
