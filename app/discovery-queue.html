@@ -1,0 +1,4966 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Discovery Queue — new components</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121a22; --line:#22303d; --ink:#e7eef5; --muted:#8499ab;
+    --faint:#5d7085; --steel:#3a4a5a; --grn:#34d399; --amb:#f5a524; --red:#f87171;
+    --sky:#5fa8ff; --vio:#a78bfa;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:radial-gradient(1100px 560px at 82% -12%,#16222e 0,transparent 60%),var(--bg);
+    color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%;padding-bottom:60px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .lbl{font-family:ui-monospace,monospace;text-transform:uppercase;letter-spacing:.12em;font-size:10px;color:var(--faint)}
+
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 22px;border-bottom:1px solid var(--line);padding-bottom:14px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .mark{width:34px;height:34px;border:2px solid var(--steel);border-radius:6px;display:grid;place-items:center;background:var(--panel);position:relative}
+  .mark::before{content:"";position:absolute;inset:5px;border:1px solid var(--line);border-radius:3px}
+  .mark span{font-family:ui-monospace,monospace;font-weight:800;color:var(--sky);font-size:15px}
+  h1{font-size:17px;margin:0;font-weight:800}
+  .stats{margin-left:auto;display:flex;gap:18px}
+  .stat{text-align:right} .stat b{font-family:ui-monospace,monospace;font-size:16px} .stat .lbl{display:block}
+
+  .pipe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0 2px;color:var(--faint);font-size:10px;font-family:ui-monospace,monospace}
+  .pipe i{color:var(--steel)}
+
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 2px}
+  .chip{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 11px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.12s}
+  .chip:hover{border-color:var(--steel);color:var(--ink)}
+  .chip[aria-pressed="true"]{background:#1c2a36;border-color:var(--sky);color:var(--ink)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(345px,1fr));gap:12px;margin-top:14px}
+  .card{background:linear-gradient(180deg,#16202a,#111922);border:1px solid var(--line);border-radius:11px;overflow:hidden;display:flex;flex-direction:column}
+  .card.approved{border-color:rgba(52,211,153,.5)} .card.rejected{opacity:.5}
+  .card.conflict{border-color:rgba(248,113,113,.5)}
+  .chead{padding:12px 13px 8px;border-bottom:1px solid var(--line)}
+  .ptype{font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .titlerow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-top:2px}
+  .title{font-size:14.5px;font-weight:700;line-height:1.25}
+  .new{font-family:ui-monospace,monospace;font-size:9px;font-weight:700;color:#0b1a12;background:var(--grn);border-radius:4px;padding:2px 5px;letter-spacing:.06em}
+  .conf{font-family:ui-monospace,monospace;font-size:9px;font-weight:700;border:1px solid;border-radius:4px;padding:2px 6px;white-space:nowrap}
+  .conf.manufacturer{color:var(--sky);border-color:var(--sky)}
+  .conf.estimated{color:var(--amb);border-color:var(--amb)}
+  .conf.unverified{color:var(--red);border-color:var(--red)}
+
+  .pop{display:flex;align-items:center;gap:8px;margin-top:9px}
+  .popbar{flex:1;height:6px;border-radius:4px;background:#1a2630;border:1px solid var(--line);overflow:hidden}
+  .popbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--vio),var(--sky))}
+  .popnum{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted)}
+  .popsig{font-size:10.5px;color:var(--faint);margin-top:3px}
+
+  .body{padding:9px 13px;flex:1}
+  .specs{display:flex;flex-wrap:wrap;gap:5px;font-family:ui-monospace,monospace;font-size:10.5px}
+  .specs .s{background:#0e161e;border:1px solid var(--line);border-radius:5px;padding:2px 7px;color:var(--ink)}
+  .chips2{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .miss{font-family:ui-monospace,monospace;font-size:10px;color:var(--amb);border:1px solid rgba(245,165,36,.4);border-radius:5px;padding:2px 6px}
+  .conflictbox{margin-top:9px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.07);border-radius:7px;padding:7px 9px}
+  .conflictbox .h{font-family:ui-monospace,monospace;font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+  .conflictbox .c{font-size:11px;color:#f5b5b5}
+
+  .srcs{margin-top:9px;display:flex;flex-direction:column;gap:3px}
+  .src{font-size:11px;display:flex;gap:6px;align-items:center}
+  .skind{font-family:ui-monospace,monospace;font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;border-radius:3px;padding:1px 5px;white-space:nowrap}
+  .skind.datasheet,.skind.manual{color:var(--grn);background:rgba(52,211,153,.12)}
+  .skind.supplier,.skind.retailer{color:var(--sky);background:rgba(95,168,255,.12)}
+  .skind.community{color:var(--faint);background:#0e161e}
+  .src a{color:var(--muted);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .src a:hover{color:var(--ink)}
+  .popnote{font-size:9.5px;color:var(--faint)}
+
+  .actions{display:flex;gap:8px;padding:10px 13px;border-top:1px solid var(--line);align-items:center}
+  .status{font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-right:auto}
+  .status.approved{color:var(--grn)} .status.rejected{color:var(--red)} .status.conflict{color:var(--red)}
+  button.act{font-family:ui-monospace,monospace;font-size:11px;border-radius:7px;padding:6px 13px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--muted);transition:.12s}
+  button.app:hover{border-color:var(--grn);color:var(--grn)} button.app.on{background:rgba(52,211,153,.15);border-color:var(--grn);color:var(--grn)}
+  button.rej:hover{border-color:var(--red);color:var(--red)} button.rej.on{background:rgba(248,113,113,.15);border-color:var(--red);color:var(--red)}
+  button.act:disabled{opacity:.4;cursor:not-allowed}
+
+  .foot{color:var(--faint);font-size:12px;margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+  .foot code{color:var(--sky)} .foot button{margin-left:8px}
+  @media(max-width:430px){.grid{grid-template-columns:1fr}.stats{gap:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="mark"><span>D</span></div>
+      <div><h1>Discovery Queue</h1><div class="lbl">New components · review &amp; approve</div></div></div>
+    <div class="stats">
+      <div class="stat"><span class="lbl">Candidates</span><b id="s-tot"></b></div>
+      <div class="stat"><span class="lbl">New</span><b id="s-new" style="color:var(--grn)"></b></div>
+      <div class="stat"><span class="lbl">Conflicts</span><b id="s-con" style="color:var(--red)"></b></div>
+      <div class="stat"><span class="lbl">Approved</span><b id="s-app" style="color:var(--grn)"></b></div>
+    </div>
+  </header>
+  <div class="pipe" id="pipe"></div>
+  <div class="controls" id="statusChips"></div>
+  <div class="controls" id="catChips"></div>
+  <div class="controls" id="toggleChips"></div>
+  <div class="grid" id="grid"></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const Q = {
+  "generated": "2026-06-15",
+  "pipeline": [
+    "Discovery",
+    "Candidate List",
+    "Spec Extraction",
+    "Source Verification",
+    "Normalize Units",
+    "Merge Plan",
+    "Add/Update parts-db.json",
+    "Missing-Spec Tasks"
+  ],
+  "rules": {
+    "spec_authority": "datasheet/manual > supplier; retailer = price/availability; community = popularity only",
+    "no_overwrite_verified": true,
+    "conflicts": "flagged for review, never auto-applied",
+    "single_source_of_truth": "parts-db.json"
+  },
+  "summary": {
+    "candidates": 69,
+    "by_action": {
+      "conflict": 1,
+      "add": 66,
+      "noop": 2
+    },
+    "new_releases": 10,
+    "conflicts": 1
+  },
+  "candidates": [
+    {
+      "id": "battle-born-bb10012",
+      "brand": "Battle Born",
+      "model": "BB10012",
+      "category": "Battery",
+      "system": "electrical",
+      "productType": "LiFePO4 100Ah",
+      "dims": {
+        "l": 12.75,
+        "w": 6.875,
+        "h": 9
+      },
+      "weightLb": 31,
+      "priceRange": {
+        "low": 989,
+        "high": 989
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 100,
+        "peakAmps": 200,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 100,
+        "fuseType": "Class-T",
+        "minWireAwg": "4 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Strap down, Group-27 footprint; no venting (LiFePO4).",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Battle Born BB10012 spec",
+          "url": "https://battlebornbatteries.com"
+        },
+        {
+          "kind": "retailer",
+          "label": "Amazon listing",
+          "url": "https://www.amazon.com"
+        },
+        {
+          "kind": "community",
+          "label": "VanPowerCalc 2026 roundup (popularity)",
+          "url": "https://vanpowercalc.com"
+        }
+      ],
+      "popularity": {
+        "score": 92,
+        "signal": "Long-standing US RV standard; most-cited 100Ah unit"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Battle Born BB10012 spec",
+        "url": "https://battlebornbatteries.com"
+      },
+      "costUsd": 989,
+      "missing": [],
+      "match": "el-bb-100",
+      "conflicts": [
+        {
+          "field": "costUsd",
+          "existing": 875,
+          "discovered": 989,
+          "note": "existing is verified \u2014 not overwritten"
+        }
+      ],
+      "fills": [],
+      "action": "conflict",
+      "status": "conflict"
+    },
+    {
+      "id": "epoch-300-v2",
+      "brand": "Epoch",
+      "model": "300Ah Heated V2",
+      "category": "Battery",
+      "system": "electrical",
+      "productType": "LiFePO4 300Ah",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 900,
+        "high": 1300
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 200,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": "Class-T",
+        "minWireAwg": null,
+        "comms": "CANBUS",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Heavy (~66 lb) \u2014 confirm floor support; self-heating.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Epoch Batteries spec",
+          "url": "https://epochbatteries.com"
+        },
+        {
+          "kind": "community",
+          "label": "FarOutRide alternatives (popularity)",
+          "url": "https://faroutride.com"
+        }
+      ],
+      "popularity": {
+        "score": 82,
+        "signal": "Rising favorite; CANBUS/Victron comms, best cost-per-kWh"
+      },
+      "newness": {
+        "releaseYear": 2025,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Epoch Batteries spec",
+        "url": "https://epochbatteries.com"
+      },
+      "costUsd": 1100,
+      "missing": [
+        "dimensions",
+        "weight",
+        "electrical"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "sok-206",
+      "brand": "SOK",
+      "model": "SK12V206",
+      "category": "Battery",
+      "system": "electrical",
+      "productType": "LiFePO4 206Ah",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 500,
+        "high": 700
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 100,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": null,
+        "comms": "BT",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "SOK product page",
+          "url": "https://www.sokbattery.com"
+        },
+        {
+          "kind": "community",
+          "label": "Builder teardown praise (popularity)",
+          "url": "https://faroutride.com"
+        }
+      ],
+      "popularity": {
+        "score": 74,
+        "signal": "Praised for teardown build quality / value"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "SOK product page",
+        "url": "https://www.sokbattery.com"
+      },
+      "costUsd": 600,
+      "missing": [
+        "dimensions",
+        "weight",
+        "electrical",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "litime-200",
+      "brand": "LiTime",
+      "model": "LT12V200",
+      "category": "Battery",
+      "system": "electrical",
+      "productType": "LiFePO4 200Ah",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 380,
+        "high": 520
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 100,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": null,
+        "comms": "BT",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "LiTime product page",
+          "url": "https://www.litime.com"
+        },
+        {
+          "kind": "community",
+          "label": "Budget pick (popularity)",
+          "url": "https://vanpowercalc.com"
+        }
+      ],
+      "popularity": {
+        "score": 76,
+        "signal": "Budget value leader (formerly Ampere Time)"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "LiTime product page",
+        "url": "https://www.litime.com"
+      },
+      "costUsd": 450,
+      "missing": [
+        "dimensions",
+        "weight",
+        "electrical",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "dakota-200",
+      "brand": "Dakota Lithium",
+      "model": "DL+ 200Ah",
+      "category": "Battery",
+      "system": "electrical",
+      "productType": "LiFePO4 200Ah",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 1100,
+        "high": 1300
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 200,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": null,
+        "comms": "BT",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Dakota Lithium page",
+          "url": "https://dakotalithium.com"
+        }
+      ],
+      "popularity": {
+        "score": 70,
+        "signal": "Cold-climate favorite, 11-yr warranty"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Dakota Lithium page",
+        "url": "https://dakotalithium.com"
+      },
+      "costUsd": 1200,
+      "missing": [
+        "dimensions",
+        "weight",
+        "electrical",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "victron-orion-xs-50",
+      "brand": "Victron",
+      "model": "ORI121217040",
+      "category": "DC-DC Charger",
+      "system": "electrical",
+      "productType": "Orion XS 12/12-50A",
+      "dims": {
+        "l": 5.4,
+        "w": 4.85,
+        "h": 1.6
+      },
+      "weightLb": 0.73,
+      "priceRange": {
+        "low": 303,
+        "high": 303
+      },
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 50,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 60,
+        "fuseType": "MEGA",
+        "minWireAwg": "6 AWG",
+        "comms": "VE.Direct/BT",
+        "switchedBy": "none",
+        "terminals": "screw",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "No fan, IP65. Fuse both ends.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Victron Orion XS",
+          "url": "https://www.victronenergy.com"
+        },
+        {
+          "kind": "retailer",
+          "label": "Current Connected",
+          "url": "https://www.currentconnected.com"
+        }
+      ],
+      "popularity": {
+        "score": 85,
+        "signal": "New standard alternator charger; replaces Orion-Tr Smart"
+      },
+      "newness": {
+        "releaseYear": 2024,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Victron Orion XS",
+        "url": "https://www.victronenergy.com"
+      },
+      "costUsd": 303,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "renogy-inv-2000",
+      "brand": "Renogy",
+      "model": "RIV12102S1",
+      "category": "Inverter/Charger",
+      "system": "electrical",
+      "productType": "2000W pure sine inverter/charger",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 450,
+        "high": 600
+      },
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 167,
+        "peakAmps": null,
+        "surgeWatts": 6000,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 250,
+        "fuseType": "Class-T",
+        "minWireAwg": "2/0 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": 2000,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Renogy datasheet",
+          "url": "https://www.renogy.com"
+        },
+        {
+          "kind": "retailer",
+          "label": "Renogy store",
+          "url": "https://www.renogy.com"
+        }
+      ],
+      "popularity": {
+        "score": 68,
+        "signal": "Common budget inverter/charger"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Renogy datasheet",
+        "url": "https://www.renogy.com"
+      },
+      "costUsd": 525,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "victron-lynx-dist",
+      "brand": "Victron",
+      "model": "LYN060102000",
+      "category": "Busbar",
+      "system": "electrical",
+      "productType": "Lynx Distributor",
+      "dims": {
+        "l": 12,
+        "w": 7,
+        "h": 4
+      },
+      "weightLb": 4,
+      "priceRange": {
+        "low": 170,
+        "high": 170
+      },
+      "electrical": {
+        "role": "distribution",
+        "voltage": "12V",
+        "contAmps": 1000,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": "MEGA",
+        "minWireAwg": "2/0 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Victron Lynx",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "popularity": {
+        "score": 80,
+        "signal": "Default modular busbar in Victron van systems"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Victron Lynx",
+        "url": "https://www.victronenergy.com"
+      },
+      "costUsd": 170,
+      "missing": [
+        "mounting"
+      ],
+      "match": "el-lynx",
+      "conflicts": [],
+      "fills": [],
+      "action": "noop",
+      "status": "pending"
+    },
+    {
+      "id": "newpowa-200",
+      "brand": "Newpowa",
+      "model": "NPA200S-12H",
+      "category": "Solar Panel",
+      "system": "electrical",
+      "productType": "200W rigid mono panel",
+      "dims": {
+        "l": 59,
+        "w": 26,
+        "h": 1.4
+      },
+      "weightLb": 24,
+      "priceRange": {
+        "low": 150,
+        "high": 150
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "N/A",
+        "contAmps": null,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "10 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "MC4",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Roof Z-brackets; one gland for the run.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Newpowa spec",
+          "url": "https://www.newpowa.com"
+        },
+        {
+          "kind": "retailer",
+          "label": "Amazon",
+          "url": "https://www.amazon.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Value rigid panel, common in DIY arrays"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Newpowa spec",
+        "url": "https://www.newpowa.com"
+      },
+      "costUsd": 150,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "rich-solar-200",
+      "brand": "Rich Solar",
+      "model": "RS-M200D",
+      "category": "Solar Panel",
+      "system": "electrical",
+      "productType": "200W rigid mono panel",
+      "dims": {
+        "l": 58,
+        "w": 26,
+        "h": 1.4
+      },
+      "weightLb": 25,
+      "priceRange": {
+        "low": 170,
+        "high": 170
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "N/A",
+        "contAmps": null,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "10 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "MC4",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Rich Solar page",
+          "url": "https://richsolar.com"
+        }
+      ],
+      "popularity": {
+        "score": 66,
+        "signal": "Popular value panel"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Rich Solar page",
+        "url": "https://richsolar.com"
+      },
+      "costUsd": 170,
+      "missing": [
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "ancor-2-0-cable",
+      "brand": "Ancor",
+      "model": "2/0 Marine Battery Cable",
+      "category": "Wire",
+      "system": "electrical",
+      "productType": "2/0 AWG tinned battery cable",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 4,
+        "high": 7
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": null,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "2/0 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "Sold per foot; pair with adhesive-lined heat shrink + tinned lugs.",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Ancor / marine spec",
+          "url": "https://www.ancorproducts.com"
+        },
+        {
+          "kind": "supplier",
+          "label": "Marine electrical supplier",
+          "url": "https://www.defender.com"
+        }
+      ],
+      "popularity": {
+        "score": 78,
+        "signal": "Marine-grade tinned cable, common for inverter/battery runs"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Ancor / marine spec",
+        "url": "https://www.ancorproducts.com"
+      },
+      "costUsd": 6,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "selterm-lugs",
+      "brand": "Selterm",
+      "model": "Tinned Copper Lug Kit",
+      "category": "Lug",
+      "system": "electrical",
+      "productType": "Battery cable lugs (assorted)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 20,
+        "high": 40
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "retailer",
+          "label": "Amazon",
+          "url": "https://www.amazon.com"
+        },
+        {
+          "kind": "community",
+          "label": "Builder favorite (popularity)",
+          "url": "https://faroutride.com"
+        }
+      ],
+      "popularity": {
+        "score": 64,
+        "signal": "Common DIY crimp-lug kit"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "retailer",
+        "label": "Amazon",
+        "url": "https://www.amazon.com"
+      },
+      "costUsd": 30,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "class-a-fresh-24",
+      "brand": "Class A Customs",
+      "model": "WT-2400",
+      "category": "Fresh Tank",
+      "system": "tank",
+      "productType": "24-gal fresh water tank",
+      "dims": {
+        "l": 30,
+        "w": 15,
+        "h": 13
+      },
+      "weightLb": 18,
+      "priceRange": {
+        "low": 160,
+        "high": 160
+      },
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 0.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": 24,
+        "fluid": "fresh"
+      },
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Class A Customs",
+          "url": "https://www.classacustoms.com"
+        }
+      ],
+      "popularity": {
+        "score": 70,
+        "signal": "Go-to van fresh-tank supplier"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Class A Customs",
+        "url": "https://www.classacustoms.com"
+      },
+      "costUsd": 160,
+      "missing": [
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "seaflo-55",
+      "brand": "SEAFLO",
+      "model": "SFDP1-055-100-51",
+      "category": "Water Pump",
+      "system": "plumbing",
+      "productType": "12V 5.5 GPM 55-PSI pump",
+      "dims": {
+        "l": 9,
+        "w": 5,
+        "h": 5
+      },
+      "weightLb": 4,
+      "priceRange": {
+        "low": 70,
+        "high": 70
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 7,
+        "peakAmps": 10,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": 5.5,
+        "connectionSizeIn": 0.5,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "fresh"
+      },
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "SEAFLO spec",
+          "url": "https://www.seaflo.com"
+        },
+        {
+          "kind": "retailer",
+          "label": "Amazon",
+          "url": "https://www.amazon.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Budget alt to Shurflo, widely used"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "SEAFLO spec",
+        "url": "https://www.seaflo.com"
+      },
+      "costUsd": 70,
+      "missing": [
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "truma-aquago",
+      "brand": "Truma",
+      "model": "AquaGo Comfort",
+      "category": "Water Heater",
+      "system": "plumbing",
+      "productType": "Tankless on-demand water heater",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 900,
+        "high": 1100
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 10,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 0.5,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "hot_water"
+      },
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "manual",
+          "label": "Truma AquaGo manual",
+          "url": "https://www.truma.com"
+        }
+      ],
+      "popularity": {
+        "score": 67,
+        "signal": "Popular tankless RV water heater"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "manual",
+        "label": "Truma AquaGo manual",
+        "url": "https://www.truma.com"
+      },
+      "costUsd": 1000,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "natures-head",
+      "brand": "Nature's Head",
+      "model": "Standard",
+      "category": "Toilet",
+      "system": "plumbing",
+      "productType": "Composting toilet",
+      "dims": {
+        "l": 20,
+        "w": 19,
+        "h": 20
+      },
+      "weightLb": 28,
+      "priceRange": {
+        "low": 1000,
+        "high": 1000
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 0.1,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 2,
+        "fuseType": "blade",
+        "minWireAwg": "18 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": null,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "waste"
+      },
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "manual",
+          "label": "Nature's Head manual",
+          "url": "https://natureshead.net"
+        },
+        {
+          "kind": "community",
+          "label": "Long-time builder standard (popularity)",
+          "url": "https://www.reddit.com"
+        }
+      ],
+      "popularity": {
+        "score": 80,
+        "signal": "Long-time composting-toilet standard"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "manual",
+        "label": "Nature's Head manual",
+        "url": "https://natureshead.net"
+      },
+      "costUsd": 1000,
+      "missing": [
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "ogo-toilet",
+      "brand": "OGO",
+      "model": "Origin",
+      "category": "Toilet",
+      "system": "plumbing",
+      "productType": "Composting toilet w/ agitator",
+      "dims": {
+        "l": 16,
+        "w": 15,
+        "h": 18
+      },
+      "weightLb": 20,
+      "priceRange": {
+        "low": 1000,
+        "high": 1000
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 2,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 5,
+        "fuseType": "blade",
+        "minWireAwg": "16 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": null,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "waste"
+      },
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "OGO product page",
+          "url": "https://www.ogo-go.com"
+        }
+      ],
+      "popularity": {
+        "score": 74,
+        "signal": "Newer compact composting toilet, electric agitator"
+      },
+      "newness": {
+        "releaseYear": 2022,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "OGO product page",
+        "url": "https://www.ogo-go.com"
+      },
+      "costUsd": 1000,
+      "missing": [
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "thetford-565",
+      "brand": "Thetford",
+      "model": "Porta Potti 565",
+      "category": "Toilet",
+      "system": "plumbing",
+      "productType": "Portable cassette toilet",
+      "dims": {
+        "l": 18,
+        "w": 15,
+        "h": 17
+      },
+      "weightLb": 12,
+      "priceRange": {
+        "low": 130,
+        "high": 130
+      },
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": null,
+        "powered": false,
+        "valveType": null,
+        "tankGal": 5.5,
+        "fluid": "waste"
+      },
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "retailer",
+          "label": "Camping World",
+          "url": "https://www.campingworld.com"
+        }
+      ],
+      "popularity": {
+        "score": 62,
+        "signal": "Common budget cassette toilet"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "retailer",
+        "label": "Camping World",
+        "url": "https://www.campingworld.com"
+      },
+      "costUsd": 130,
+      "missing": [
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "maxxair-7500k",
+      "brand": "MaxxAir",
+      "model": "MaxxFan Deluxe 7500K",
+      "category": "Roof Fan",
+      "system": "hvac",
+      "productType": "14\u00d714 roof vent fan w/ remote",
+      "dims": {
+        "l": 16,
+        "w": 16,
+        "h": 4
+      },
+      "weightLb": 12,
+      "priceRange": {
+        "low": 300,
+        "high": 300
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 15,
+        "recommendedFuseA": 7.5,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "14\u00d714 cutout + butyl; lap-seal flange.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "manual",
+          "label": "MaxxAir manual",
+          "url": "https://www.maxxair.com"
+        },
+        {
+          "kind": "community",
+          "label": "Most-installed van fan (popularity)",
+          "url": "https://www.reddit.com"
+        }
+      ],
+      "popularity": {
+        "score": 90,
+        "signal": "The default van roof fan"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "manual",
+        "label": "MaxxAir manual",
+        "url": "https://www.maxxair.com"
+      },
+      "costUsd": 300,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "dometic-rtx-2000",
+      "brand": "Dometic",
+      "model": "CoolAir RTX 2000",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "12V rooftop DC air conditioner",
+      "dims": {
+        "l": 25.4,
+        "w": 33.9,
+        "h": 6.6
+      },
+      "weightLb": 71,
+      "priceRange": {
+        "low": 2500,
+        "high": 3000
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 10,
+        "peakAmps": 45,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 120,
+        "recommendedFuseA": 80,
+        "fuseType": "MEGA",
+        "minWireAwg": "4 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Roof; ~6,824 BTU; ~9.5A eco. Cutout ~14.5\u00d715.5. Size 4 AWG / 80A.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Dometic RTX 2000",
+          "url": "https://www.dometic.com"
+        }
+      ],
+      "popularity": {
+        "score": 78,
+        "signal": "Established 12V rooftop AC"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Dometic RTX 2000",
+        "url": "https://www.dometic.com"
+      },
+      "costUsd": 2750,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "velit-2000r",
+      "brand": "Velit",
+      "model": "2000R",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "12/24/48V rooftop DC AC",
+      "dims": {
+        "l": 31.5,
+        "w": 31.5,
+        "h": 7.1
+      },
+      "weightLb": 61,
+      "priceRange": {
+        "low": 1599,
+        "high": 1599
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 20,
+        "peakAmps": 60,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 80,
+        "fuseType": "MEGA",
+        "minWireAwg": "4 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "~8,000 BTU; 20-60A; 45-58 dB; BT app. Roof-unit dims per overview (verify vs datasheet).",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "manual",
+          "label": "Velit 2000R user manual",
+          "url": "https://velitcamping.com"
+        },
+        {
+          "kind": "community",
+          "label": "Fast-rising affordable 12V AC (popularity)",
+          "url": "https://faroutride.com"
+        }
+      ],
+      "popularity": {
+        "score": 80,
+        "signal": "Newest popular low-cost 12V rooftop AC"
+      },
+      "newness": {
+        "releaseYear": 2023,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "manual",
+        "label": "Velit 2000R user manual",
+        "url": "https://velitcamping.com"
+      },
+      "costUsd": 1599,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "nomadic-x2",
+      "brand": "Nomadic Cooling",
+      "model": "X2",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "12V rooftop DC AC",
+      "dims": {
+        "l": 28,
+        "w": 22.5,
+        "h": 6.9
+      },
+      "weightLb": 44,
+      "priceRange": {
+        "low": 2400,
+        "high": 2700
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 35,
+        "peakAmps": 65,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 200,
+        "recommendedFuseA": 80,
+        "fuseType": "MEGA",
+        "minWireAwg": "4 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Fits 14\u00d714 cutout; ~35A eco to ~65A max; 9,500-12,150 BTU.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Nomadic Cooling page",
+          "url": "https://nomadiccooling.com"
+        },
+        {
+          "kind": "community",
+          "label": "Pioneer 12V AC, easy install (popularity)",
+          "url": "https://faroutride.com"
+        }
+      ],
+      "popularity": {
+        "score": 75,
+        "signal": "Pioneer 12V rooftop AC; fits MaxxFan cutout"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Nomadic Cooling page",
+        "url": "https://nomadiccooling.com"
+      },
+      "costUsd": 2550,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "webasto-2000stc",
+      "brand": "Webasto",
+      "model": "Air Top 2000 STC",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "2kW diesel air heater",
+      "dims": {
+        "l": 12.2,
+        "w": 4.7,
+        "h": 4.6
+      },
+      "weightLb": 5.7,
+      "priceRange": {
+        "low": 1100,
+        "high": 1400
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 10,
+        "surgeWatts": 110,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Underfloor or interior w/ ducting; exhaust fully outside (CO).",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "manual",
+          "label": "Webasto installation manual",
+          "url": "https://www.webasto.com"
+        }
+      ],
+      "popularity": {
+        "score": 82,
+        "signal": "One of the two dominant diesel heaters"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "manual",
+        "label": "Webasto installation manual",
+        "url": "https://www.webasto.com"
+      },
+      "costUsd": 1250,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "amauto-slider",
+      "brand": "AM Auto",
+      "model": "T4 Sliding Window",
+      "category": "Window",
+      "system": "material",
+      "productType": "Bonded sliding window (Sprinter/Transit)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 300,
+        "high": 450
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "Model varies by van + side; confirm fitment.",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "AM Auto",
+          "url": "https://www.amauto.us"
+        }
+      ],
+      "popularity": {
+        "score": 70,
+        "signal": "Common bonded van window supplier"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "AM Auto",
+        "url": "https://www.amauto.us"
+      },
+      "costUsd": 375,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "vanglass-bunk",
+      "brand": "VanGlassUSA",
+      "model": "Bunk Window",
+      "category": "Window",
+      "system": "material",
+      "productType": "Bonded fixed bunk window",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 200,
+        "high": 350
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "Fitment by van model + opening.",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "VanGlassUSA",
+          "url": "https://vanglassusa.com"
+        }
+      ],
+      "popularity": {
+        "score": 66,
+        "signal": "Popular fixed/bunk windows"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "VanGlassUSA",
+        "url": "https://vanglassusa.com"
+      },
+      "costUsd": 275,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "frontrunner-slimline",
+      "brand": "Front Runner",
+      "model": "Slimline II",
+      "category": "Roof Rack",
+      "system": "roof",
+      "productType": "Modular roof rack platform",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 900,
+        "high": 1500
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "Kit sized per van + roof length.",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Front Runner spec",
+          "url": "https://www.frontrunneroutfitters.com"
+        },
+        {
+          "kind": "community",
+          "label": "Overland staple (popularity)",
+          "url": "https://www.reddit.com"
+        }
+      ],
+      "popularity": {
+        "score": 80,
+        "signal": "Overland roof-rack staple"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Front Runner spec",
+        "url": "https://www.frontrunneroutfitters.com"
+      },
+      "costUsd": 1200,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "aluminess-rack",
+      "brand": "Aluminess",
+      "model": "Roof Rack",
+      "category": "Roof Rack",
+      "system": "roof",
+      "productType": "Welded aluminum roof rack",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 1500,
+        "high": 2500
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "Van-specific; confirm model.",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Aluminess",
+          "url": "https://www.aluminess.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Premium welded van rack"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Aluminess",
+        "url": "https://www.aluminess.com"
+      },
+      "costUsd": 2000,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "havelock-wool",
+      "brand": "Havelock Wool",
+      "model": "Batt/Loose",
+      "category": "Insulation",
+      "system": "material",
+      "productType": "Sheep-wool insulation",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "Sold by area; combine batt + loose fill.",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Havelock Wool",
+          "url": "https://havelockwool.com"
+        },
+        {
+          "kind": "community",
+          "label": "Builder favorite (popularity)",
+          "url": "https://www.reddit.com"
+        }
+      ],
+      "popularity": {
+        "score": 82,
+        "signal": "Most-cited natural van insulation"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Havelock Wool",
+        "url": "https://havelockwool.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "weight",
+        "cost",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "thinsulate-sm600l",
+      "brand": "3M",
+      "model": "Thinsulate SM600L",
+      "category": "Insulation",
+      "system": "material",
+      "productType": "Synthetic insulation roll",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "Spray-adhesive to walls/ceiling; sold per yard.",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "3M Thinsulate SM600L",
+          "url": "https://www.3m.com"
+        },
+        {
+          "kind": "community",
+          "label": "Builder favorite (popularity)",
+          "url": "https://faroutride.com"
+        }
+      ],
+      "popularity": {
+        "score": 80,
+        "signal": "Hydrophobic synthetic, very popular"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "3M Thinsulate SM600L",
+        "url": "https://www.3m.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "weight",
+        "cost",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "baltic-birch-half",
+      "brand": "Generic",
+      "model": "Baltic Birch 1/2\" 5\u00d75",
+      "category": "Plywood",
+      "system": "material",
+      "productType": "Cabinet-grade plywood sheet",
+      "dims": {
+        "l": 60,
+        "w": 60,
+        "h": 0.5
+      },
+      "weightLb": 36,
+      "priceRange": {
+        "low": 60,
+        "high": 90
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "\u00bd\" \u2248 1.45 lb/sqft.",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Lumber supplier",
+          "url": "https://www.homedepot.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Standard cabinetry plywood"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Lumber supplier",
+        "url": "https://www.homedepot.com"
+      },
+      "costUsd": 75,
+      "missing": [
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "8020-1010",
+      "brand": "80/20",
+      "model": "1010 (1\" T-slot)",
+      "category": "Aluminum Extrusion",
+      "system": "material",
+      "productType": "10-series 1\"\u00d71\" T-slot extrusion",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "~0.30 lb/ft; pair with t-nuts + corner brackets.",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "80/20 1010 spec",
+          "url": "https://8020.net"
+        }
+      ],
+      "popularity": {
+        "score": 76,
+        "signal": "Common 10-series framing for van interiors"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "80/20 1010 spec",
+        "url": "https://8020.net"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "weight",
+        "cost",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "lagun-mount",
+      "brand": "Lagun",
+      "model": "Table Leg Mount",
+      "category": "Cabinet Hardware",
+      "system": "cabinetry",
+      "productType": "Swiveling table-leg mount",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 150,
+        "high": 200
+      },
+      "electrical": null,
+      "plumbing": null,
+      "mounting": "",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Lagun / supplier",
+          "url": "https://www.lagunsupply.com"
+        },
+        {
+          "kind": "community",
+          "label": "Van table standard (popularity)",
+          "url": "https://www.reddit.com"
+        }
+      ],
+      "popularity": {
+        "score": 78,
+        "signal": "The default van table mount"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Lagun / supplier",
+        "url": "https://www.lagunsupply.com"
+      },
+      "costUsd": 175,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "johnguest-fittings",
+      "brand": "John Guest",
+      "model": "Speedfit 1/2\"",
+      "category": "Plumbing Fitting",
+      "system": "plumbing",
+      "productType": "Push-to-connect water fittings",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 2,
+        "high": 6
+      },
+      "electrical": null,
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 0.5,
+        "powered": false,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "fresh"
+      },
+      "mounting": "",
+      "compatibilityNotes": "\u00bd\" PEX/tube push-fit; no-tool joints.",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "John Guest Speedfit",
+          "url": "https://www.johnguest.com"
+        }
+      ],
+      "popularity": {
+        "score": 74,
+        "signal": "Standard push-fit plumbing fittings"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "John Guest Speedfit",
+        "url": "https://www.johnguest.com"
+      },
+      "costUsd": 4,
+      "missing": [
+        "dimensions",
+        "weight",
+        "mounting"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "espar-s3-d2l",
+      "brand": "Espar",
+      "model": "Airtronic S3 D2L",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "2.2kW diesel air heater (altitude-comp)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 1300,
+        "high": 1500
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 10,
+        "surgeWatts": 110,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Underfloor/interior + ducting; exhaust fully outside (CO).",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Espar Airtronic S3 datasheet",
+          "url": "https://www.espar.com"
+        },
+        {
+          "kind": "community",
+          "label": "Top-rated diesel heater 2026 (popularity)",
+          "url": "https://www.thewaywardhome.com"
+        }
+      ],
+      "popularity": {
+        "score": 84,
+        "signal": "Premium diesel heater; automatic altitude adjustment"
+      },
+      "newness": {
+        "releaseYear": 2023,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Espar Airtronic S3 datasheet",
+        "url": "https://www.espar.com"
+      },
+      "costUsd": 1400,
+      "missing": [
+        "dimensions",
+        "weight"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "vevor-d1",
+      "brand": "VEVOR",
+      "model": "XMZ-F-D1",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "2kW budget diesel air heater",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 120,
+        "high": 180
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 10,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "2kW is right-sized for a van; louder fuel pump than premium units.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "retailer",
+          "label": "Amazon listing",
+          "url": "https://www.amazon.com"
+        },
+        {
+          "kind": "community",
+          "label": "Budget diesel heater favorite (popularity)",
+          "url": "https://everywherewithclaire.com"
+        }
+      ],
+      "popularity": {
+        "score": 70,
+        "signal": "Budget Chinese diesel heater; huge install base"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "retailer",
+        "label": "Amazon listing",
+        "url": "https://www.amazon.com"
+      },
+      "costUsd": 150,
+      "missing": [
+        "dimensions",
+        "weight"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "precisiontemp-550nsp",
+      "brand": "PrecisionTemp",
+      "model": "550NSP-EC",
+      "category": "Water Heater",
+      "system": "plumbing",
+      "productType": "Floor-vented tankless propane water heater",
+      "dims": {
+        "l": 13.5,
+        "w": 13.5,
+        "h": 14.25
+      },
+      "weightLb": 26.5,
+      "priceRange": {
+        "low": 1200,
+        "high": 1500
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 7.5,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": 0.5,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "hot_water"
+      },
+      "mounting": "Vents through floor (2 inch exhaust); 55,000 BTU max; propane.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "PrecisionTemp 550NSP-EC",
+          "url": "https://precisiontemp.com"
+        }
+      ],
+      "popularity": {
+        "score": 78,
+        "signal": "Most-cited van tankless water heater"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "PrecisionTemp 550NSP-EC",
+        "url": "https://precisiontemp.com"
+      },
+      "costUsd": 1350,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "camplux-rs264",
+      "brand": "Camplux",
+      "model": "RS264",
+      "category": "Water Heater",
+      "system": "plumbing",
+      "productType": "Tankless propane water heater 2.64 GPM",
+      "dims": {
+        "l": 15.1,
+        "w": 12.8,
+        "h": 12.6
+      },
+      "weightLb": 35,
+      "priceRange": {
+        "low": 550,
+        "high": 550
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 2,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 5,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": 2.64,
+        "connectionSizeIn": 0.5,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "hot_water"
+      },
+      "mounting": "65,000 BTU; propane; confirm venting + clearances.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "retailer",
+          "label": "Retailer listing",
+          "url": "https://www.amazon.com"
+        }
+      ],
+      "popularity": {
+        "score": 64,
+        "signal": "Budget tankless option"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "retailer",
+        "label": "Retailer listing",
+        "url": "https://www.amazon.com"
+      },
+      "costUsd": 550,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "autoterm-2d",
+      "brand": "Autoterm",
+      "model": "Air 2D",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "2kW diesel air heater (Planar)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": 450,
+        "high": 600
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 10,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "122R/10R certified; popular Webasto/Espar alternative.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Autoterm/Planar supplier",
+          "url": "https://www.tprc.us"
+        },
+        {
+          "kind": "community",
+          "label": "Overlander favorite (popularity)",
+          "url": "https://www.thevanconversion.com"
+        }
+      ],
+      "popularity": {
+        "score": 76,
+        "signal": "Robust mid-tier diesel heater, 2-yr warranty"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Autoterm/Planar supplier",
+        "url": "https://www.tprc.us"
+      },
+      "costUsd": 525,
+      "missing": [
+        "dimensions",
+        "weight"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "webasto-pro25",
+      "brand": "Webasto",
+      "model": "Air Top Pro 25",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "0.7-2.5kW diesel air heater",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 10,
+        "surgeWatts": 110,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Underfloor/interior + ducting; exhaust fully outside (CO).",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Webasto site (spec via overview; verify)",
+          "url": "https://www.webasto.com"
+        }
+      ],
+      "popularity": {
+        "score": 74,
+        "signal": "Whisper-quiet; altitude-ready to ~5,500 m"
+      },
+      "newness": {
+        "releaseYear": 2023,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Webasto site (spec via overview; verify)",
+        "url": "https://www.webasto.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "weight",
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "webasto-evo40",
+      "brand": "Webasto",
+      "model": "Air Top Evo 40",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "1.5-4.0kW diesel/gas air heater",
+      "dims": {
+        "l": 16.7,
+        "w": 5.8,
+        "h": 6.4
+      },
+      "weightLb": 13,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 4,
+        "peakAmps": 12,
+        "surgeWatts": 110,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 20,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "approx 5,100-13,650 BTU; ducted; exhaust outside.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Webasto site (spec via overview; verify)",
+          "url": "https://www.webasto.com"
+        }
+      ],
+      "popularity": {
+        "score": 76,
+        "signal": "Altitude-compensating; mid-output"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Webasto site (spec via overview; verify)",
+        "url": "https://www.webasto.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "webasto-evo55",
+      "brand": "Webasto",
+      "model": "Air Top Evo 55",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "1.5-5.5kW diesel/gas air heater",
+      "dims": {
+        "l": 16.7,
+        "w": 5.8,
+        "h": 6.4
+      },
+      "weightLb": 13,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 14,
+        "surgeWatts": 110,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 20,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "approx 5,100-18,800 BTU; same body as Evo 40.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Webasto site (spec via overview; verify)",
+          "url": "https://www.webasto.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Higher output for larger vans"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Webasto site (spec via overview; verify)",
+        "url": "https://www.webasto.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "rixen-s3-hydronic",
+      "brand": "Rixen",
+      "model": "S-3 Hydronic (MCS-7)",
+      "category": "Hydronic Heater",
+      "system": "hvac",
+      "productType": "Diesel hydronic furnace (heat + hot water)",
+      "dims": {
+        "l": 8.5,
+        "w": 3.5,
+        "h": 5.6
+      },
+      "weightLb": 4.4,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 4,
+        "peakAmps": 10,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": null,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "hot_water"
+      },
+      "mounting": "Furnace dims/weight only; full glycol system (pump/tank/handlers) adds 40+ lb. Exhaust outside.",
+      "compatibilityNotes": "approx 8,200-17,100 BTU; multi-zone; electric backup option.",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Rixen site (spec via overview; verify)",
+          "url": "https://www.rixens.com"
+        }
+      ],
+      "popularity": {
+        "score": 68,
+        "signal": "Premium integrated heat + hot water (glycol loop)"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Rixen site (spec via overview; verify)",
+        "url": "https://www.rixens.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "rixen-mcs-one",
+      "brand": "Rixen",
+      "model": "MCS One",
+      "category": "Hydronic Heater",
+      "system": "hvac",
+      "productType": "All-in-one hydronic furnace + hot water",
+      "dims": {
+        "l": 18,
+        "w": 15.25,
+        "h": null
+      },
+      "weightLb": 45,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 4,
+        "peakAmps": 10,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": null,
+        "powered": true,
+        "valveType": null,
+        "tankGal": null,
+        "fluid": "hot_water"
+      },
+      "mounting": "approx 45 lb total; integrated furnace + hot water.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Rixen site (spec via overview; verify)",
+          "url": "https://www.rixens.com"
+        }
+      ],
+      "popularity": {
+        "score": 66,
+        "signal": "Newer integrated all-in-one unit"
+      },
+      "newness": {
+        "releaseYear": 2024,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Rixen site (spec via overview; verify)",
+        "url": "https://www.rixens.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "propex-hs2000",
+      "brand": "Propex",
+      "model": "HS2000",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "LPG forced-air heater (~6,500 BTU)",
+      "dims": {
+        "l": 15.5,
+        "w": 6.8,
+        "h": 4
+      },
+      "weightLb": 6,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 6,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 10,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Runs on propane (no diesel); small 12V fan draw; quiet.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Propex site (spec via overview; verify)",
+          "url": "https://propexheating.com"
+        }
+      ],
+      "popularity": {
+        "score": 70,
+        "signal": "Simple LPG install if you already carry propane"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Propex site (spec via overview; verify)",
+        "url": "https://propexheating.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "propex-hs2800",
+      "brand": "Propex",
+      "model": "HS2800",
+      "category": "Heater",
+      "system": "hvac",
+      "productType": "2.8kW LPG forced-air heater",
+      "dims": {
+        "l": 17,
+        "w": 7.5,
+        "h": 5.7
+      },
+      "weightLb": 17,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 3,
+        "peakAmps": 6,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 10,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Propane-fired; larger body than HS2000.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Propex site (spec via overview; verify)",
+          "url": "https://propexheating.com"
+        }
+      ],
+      "popularity": {
+        "score": 66,
+        "signal": "Higher-output LPG option"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Propex site (spec via overview; verify)",
+        "url": "https://propexheating.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "truma-combi-4e",
+      "brand": "Truma",
+      "model": "Combi 4E",
+      "category": "Combi Heater",
+      "system": "hvac",
+      "productType": "Gas/electric heat + hot water (2-6kW)",
+      "dims": {
+        "l": 20.6,
+        "w": 18.3,
+        "h": 11.8
+      },
+      "weightLb": 35,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 4,
+        "peakAmps": 8,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 10,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": {
+        "flowGpm": null,
+        "connectionSizeIn": null,
+        "powered": true,
+        "valveType": null,
+        "tankGal": 2.6,
+        "fluid": "hot_water"
+      },
+      "mounting": "approx 35 lb empty; gas + optional 120V electric element; ~10 L boiler.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Truma site (spec via overview; verify)",
+          "url": "https://www.truma.com"
+        }
+      ],
+      "popularity": {
+        "score": 68,
+        "signal": "Integrated heat + water; popular in Europe"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Truma site (spec via overview; verify)",
+        "url": "https://www.truma.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "nomadic-x3",
+      "brand": "Nomadic Cooling",
+      "model": "X3 (Helix)",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "12V/48V rooftop DC AC (max output)",
+      "dims": {
+        "l": 31.5,
+        "w": 30.9,
+        "h": 7.36
+      },
+      "weightLb": 57.3,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 50,
+        "peakAmps": 110,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 260,
+        "recommendedFuseA": 150,
+        "fuseType": "MEGA",
+        "minWireAwg": "2/0 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "14x14 cutout; 11,830-15,120 BTU; up to ~110A at 12V max (far lower on 48V).",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Nomadic Cooling site (spec via overview; verify)",
+          "url": "https://nomadiccooling.com"
+        }
+      ],
+      "popularity": {
+        "score": 74,
+        "signal": "Most powerful in the lineup; quiet"
+      },
+      "newness": {
+        "releaseYear": 2024,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Nomadic Cooling site (spec via overview; verify)",
+        "url": "https://nomadiccooling.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "velit-2000r-mini",
+      "brand": "Velit",
+      "model": "2000R Mini",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "12V rooftop DC AC (compact)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": null,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 20,
+        "peakAmps": 50,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 60,
+        "fuseType": "MEGA",
+        "minWireAwg": "6 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "~6,500-7,500 BTU; ~20A min; low-profile.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Velit site (spec via overview; verify)",
+          "url": "https://velitcamping.com"
+        }
+      ],
+      "popularity": {
+        "score": 70,
+        "signal": "Lower-draw compact Velit"
+      },
+      "newness": {
+        "releaseYear": 2024,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Velit site (spec via overview; verify)",
+        "url": "https://velitcamping.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "weight",
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "indelb-plein-aircon",
+      "brand": "Indel B",
+      "model": "Plein-Aircon OFF",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "12V rooftop DC AC (compact)",
+      "dims": {
+        "l": 31.5,
+        "w": 26.4,
+        "h": 9.7
+      },
+      "weightLb": 55.8,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 16,
+        "peakAmps": 42,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 60,
+        "fuseType": "MEGA",
+        "minWireAwg": "4 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Cutout 15.75x15.75 (400x400mm); ~4,100 BTU (1,200W); 16-42A.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Indel B site (spec via overview; verify)",
+          "url": "https://www.indelb.com"
+        }
+      ],
+      "popularity": {
+        "score": 64,
+        "signal": "Compact, strong dehumidify; smaller vans"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Indel B site (spec via overview; verify)",
+        "url": "https://www.indelb.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "houghton-belaire-135",
+      "brand": "Houghton / RecPro",
+      "model": "Belaire 13.5K Low-Profile",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "Low-profile rooftop AC + heat pump",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": 7
+      },
+      "weightLb": 75,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "120V",
+        "contAmps": null,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "12 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": 1550
+      },
+      "plumbing": null,
+      "mounting": "13,500 BTU; standard RV cutout; 120V (~1,550W) or 48V DC version; heat pump.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "RecPro/Houghton site (spec via overview; verify)",
+          "url": "https://www.recpro.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Popular low-profile AC + heat pump"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "RecPro/Houghton site (spec via overview; verify)",
+        "url": "https://www.recpro.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "cost",
+        "electrical"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "houghton-95",
+      "brand": "Houghton / RecPro",
+      "model": "9.5K Low-Profile",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "Low-profile rooftop AC",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": 7
+      },
+      "weightLb": 65,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "120V",
+        "contAmps": null,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": null,
+        "fuseType": null,
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": 1100
+      },
+      "plumbing": null,
+      "mounting": "9,500 BTU; standard RV cutout; 120V or 48V DC version.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "RecPro/Houghton site (spec via overview; verify)",
+          "url": "https://www.recpro.com"
+        }
+      ],
+      "popularity": {
+        "score": 66,
+        "signal": "Smaller-footprint low-profile option"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "RecPro/Houghton site (spec via overview; verify)",
+        "url": "https://www.recpro.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "cost",
+        "electrical"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "zerobreeze-mark3",
+      "brand": "Zero Breeze",
+      "model": "Mark 3",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "Portable battery air conditioner",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": 35,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 20,
+        "peakAmps": 40,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 30,
+        "fuseType": "blade",
+        "minWireAwg": "10 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Portable - no roof cutout; ~2,300+ BTU; battery or 12V; spot cooling only.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Zero Breeze site (spec via overview; verify)",
+          "url": "https://www.zerobreeze.com"
+        }
+      ],
+      "popularity": {
+        "score": 66,
+        "signal": "Highly portable spot cooling (no roof install)"
+      },
+      "newness": {
+        "releaseYear": 2024,
+        "isNew": true
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Zero Breeze site (spec via overview; verify)",
+        "url": "https://www.zerobreeze.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "ecoflow-wave2",
+      "brand": "EcoFlow",
+      "model": "Wave 2",
+      "category": "Air Conditioner",
+      "system": "hvac",
+      "productType": "Portable AC / heat (~5,000 BTU)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": 40,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 30,
+        "peakAmps": 60,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 60,
+        "fuseType": "MEGA",
+        "minWireAwg": "8 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Portable; ~5,000 BTU modes; runs on battery/AC/DC; add-on battery.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "EcoFlow site (spec via overview; verify)",
+          "url": "https://www.ecoflow.com"
+        }
+      ],
+      "popularity": {
+        "score": 68,
+        "signal": "Flexible portable; battery / AC / DC"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "EcoFlow site (spec via overview; verify)",
+        "url": "https://www.ecoflow.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "dometic-cfx3-45",
+      "brand": "Dometic",
+      "model": "CFX3 45",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Portable 12V chest fridge (45-58 Qt)",
+      "dims": {
+        "l": 28,
+        "w": 19,
+        "h": 18
+      },
+      "weightLb": 43,
+      "priceRange": {
+        "low": 800,
+        "high": 1000
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 35,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Portable chest; dual-zone fridge/freezer option; Secop compressor.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Dometic site (spec via overview; verify)",
+          "url": "https://www.dometic.com"
+        }
+      ],
+      "popularity": {
+        "score": 88,
+        "signal": "Premium all-around van fridge; app control"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Dometic site (spec via overview; verify)",
+        "url": "https://www.dometic.com"
+      },
+      "costUsd": 900,
+      "missing": [],
+      "match": "ap-fridge-45",
+      "conflicts": [],
+      "fills": [],
+      "action": "noop",
+      "status": "pending"
+    },
+    {
+      "id": "dometic-crx-50",
+      "brand": "Dometic",
+      "model": "CRX 50",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Built-in upright 12V fridge (~50L)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": 60,
+      "priceRange": {
+        "low": 900,
+        "high": 1200
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 30,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Built-in front-load; cabinet install; dims vary by model.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Dometic site (spec via overview; verify)",
+          "url": "https://www.dometic.com"
+        }
+      ],
+      "popularity": {
+        "score": 80,
+        "signal": "Reliable built-in front-load for cabinet installs"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Dometic site (spec via overview; verify)",
+        "url": "https://www.dometic.com"
+      },
+      "costUsd": 1050,
+      "missing": [
+        "dimensions"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "isotherm-85",
+      "brand": "Isotherm",
+      "model": "Cruise 85",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Built-in 12V fridge (85L)",
+      "dims": {
+        "l": 19.9,
+        "w": 18.5,
+        "h": 20.8
+      },
+      "weightLb": 53,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 4,
+        "peakAmps": 6,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 19,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "~0.7-0.9 Ah/hr; small freezer; built-in.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Isotherm site (spec via overview; verify)",
+          "url": "https://www.indelb.com"
+        }
+      ],
+      "popularity": {
+        "score": 78,
+        "signal": "Efficient, lightweight; good for solos/short trips"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Isotherm site (spec via overview; verify)",
+        "url": "https://www.indelb.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "isotherm-130",
+      "brand": "Isotherm",
+      "model": "Cruise 130",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Built-in 12V fridge (130L)",
+      "dims": {
+        "l": 21.6,
+        "w": 20.1,
+        "h": 30.3
+      },
+      "weightLb": 57,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 29,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "~1.0-1.4 Ah/hr; built-in upright.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Isotherm site (spec via overview; verify)",
+          "url": "https://www.indelb.com"
+        }
+      ],
+      "popularity": {
+        "score": 78,
+        "signal": "Balanced size for couples"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Isotherm site (spec via overview; verify)",
+        "url": "https://www.indelb.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "isotherm-200",
+      "brand": "Isotherm",
+      "model": "Cruise 200",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Built-in 12V fridge (200L)",
+      "dims": {
+        "l": 21.4,
+        "w": 20.4,
+        "h": 50.3
+      },
+      "weightLb": 90,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 6,
+        "peakAmps": 9,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 43,
+        "recommendedFuseA": 20,
+        "fuseType": "blade",
+        "minWireAwg": "12 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "~1.6-2.0 Ah/hr; larger freezer; heavy - check support.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Isotherm site (spec via overview; verify)",
+          "url": "https://www.indelb.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Full-time / family capacity"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Isotherm site (spec via overview; verify)",
+        "url": "https://www.indelb.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "arb-50qt",
+      "brand": "ARB",
+      "model": "Classic 50Qt (47L)",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Portable 12V chest fridge (~50 Qt)",
+      "dims": {
+        "l": 29.5,
+        "w": 22,
+        "h": 19
+      },
+      "weightLb": 52,
+      "priceRange": {
+        "low": 900,
+        "high": 1100
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 35,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Rugged portable chest; reliable compressor.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "ARB site (spec via overview; verify)",
+          "url": "https://www.arbusa.com"
+        }
+      ],
+      "popularity": {
+        "score": 76,
+        "signal": "Rugged overlanding chest fridge"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "ARB site (spec via overview; verify)",
+        "url": "https://www.arbusa.com"
+      },
+      "costUsd": 1000,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "vitrifrigo-c51i",
+      "brand": "Vitrifrigo",
+      "model": "C51i",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Built-in 12V fridge (~50L)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": 60,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 30,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Built-in upright; dims vary by model.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Vitrifrigo site (spec via overview; verify)",
+          "url": "https://www.vitrifrigo.com"
+        }
+      ],
+      "popularity": {
+        "score": 70,
+        "signal": "Marine-grade durability; Secop/Danfoss compressor"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Vitrifrigo site (spec via overview; verify)",
+        "url": "https://www.vitrifrigo.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "novakool-r5810",
+      "brand": "NovaKool",
+      "model": "R5810",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Built-in 12V fridge (~5.8 cu ft)",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": 65,
+      "priceRange": {
+        "low": null,
+        "high": null
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 35,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Cabinet install; includes small freezer.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "NovaKool site (spec via overview; verify)",
+          "url": "https://www.novakool.com"
+        }
+      ],
+      "popularity": {
+        "score": 68,
+        "signal": "Quiet built-in for full-time use"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "NovaKool site (spec via overview; verify)",
+        "url": "https://www.novakool.com"
+      },
+      "costUsd": null,
+      "missing": [
+        "dimensions",
+        "cost"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "bougerv-30qt",
+      "brand": "BougeRV",
+      "model": "30 Qt",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Budget portable 12V fridge (30 Qt)",
+      "dims": {
+        "l": 22.7,
+        "w": 12.6,
+        "h": 15.6
+      },
+      "weightLb": 23,
+      "priceRange": {
+        "low": 250,
+        "high": 380
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 4,
+        "peakAmps": 6,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 25,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Affordable portable; single-zone.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "retailer",
+          "label": "Retailer listing (spec via overview; verify)",
+          "url": "https://www.bougerv.com"
+        }
+      ],
+      "popularity": {
+        "score": 66,
+        "signal": "Budget portable; shorter lifespan"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "retailer",
+        "label": "Retailer listing (spec via overview; verify)",
+        "url": "https://www.bougerv.com"
+      },
+      "costUsd": 315,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "alpicool-c55",
+      "brand": "Alpicool",
+      "model": "C55 (55 Qt)",
+      "category": "Refrigerator",
+      "system": "appliance",
+      "productType": "Budget portable 12V fridge (55 Qt)",
+      "dims": {
+        "l": 27,
+        "w": 16,
+        "h": 20
+      },
+      "weightLb": 40,
+      "priceRange": {
+        "low": 300,
+        "high": 450
+      },
+      "electrical": {
+        "role": "load",
+        "voltage": "12V",
+        "contAmps": 5,
+        "peakAmps": 7,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": 38,
+        "recommendedFuseA": 15,
+        "fuseType": "blade",
+        "minWireAwg": "14 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": null,
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Affordable; check long-term reliability.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "retailer",
+          "label": "Retailer listing (spec via overview; verify)",
+          "url": "https://www.alpicool.com"
+        },
+        {
+          "kind": "community",
+          "label": "Popular budget pick (popularity)",
+          "url": "https://www.reddit.com"
+        }
+      ],
+      "popularity": {
+        "score": 68,
+        "signal": "Budget large-capacity portable"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "retailer",
+        "label": "Retailer listing (spec via overview; verify)",
+        "url": "https://www.alpicool.com"
+      },
+      "costUsd": 375,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "renogy-200ah",
+      "brand": "Renogy",
+      "model": "12V 200Ah Core",
+      "category": "Battery",
+      "system": "electrical",
+      "productType": "LiFePO4 200Ah",
+      "dims": {
+        "l": 20.6,
+        "w": 9.5,
+        "h": 8.6
+      },
+      "weightLb": 50,
+      "priceRange": {
+        "low": 600,
+        "high": 900
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 100,
+        "peakAmps": 200,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 125,
+        "fuseType": "Class-T",
+        "minWireAwg": "2 AWG",
+        "comms": "BT",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Strap down; Bluetooth option; low-temp cutoff.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Renogy site (spec via overview; verify)",
+          "url": "https://www.renogy.com"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Affordable 200Ah with low-temp protection"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Renogy site (spec via overview; verify)",
+        "url": "https://www.renogy.com"
+      },
+      "costUsd": 750,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "battleborn-270",
+      "brand": "Battle Born",
+      "model": "BB270",
+      "category": "Battery",
+      "system": "electrical",
+      "productType": "LiFePO4 270Ah",
+      "dims": {
+        "l": null,
+        "w": null,
+        "h": null
+      },
+      "weightLb": 77,
+      "priceRange": {
+        "low": 2000,
+        "high": 2500
+      },
+      "electrical": {
+        "role": "source",
+        "voltage": "12V",
+        "contAmps": 200,
+        "peakAmps": 400,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 250,
+        "fuseType": "Class-T",
+        "minWireAwg": "2/0 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Heavy (~73-81 lb) - confirm floor support.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Battle Born site (spec via overview; verify)",
+          "url": "https://battlebornbatteries.com"
+        }
+      ],
+      "popularity": {
+        "score": 76,
+        "signal": "Large single-battery house bank"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Battle Born site (spec via overview; verify)",
+        "url": "https://battlebornbatteries.com"
+      },
+      "costUsd": 2250,
+      "missing": [
+        "dimensions"
+      ],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "victron-multiplus-ii-3000",
+      "brand": "Victron",
+      "model": "MultiPlus-II 12/3000/120",
+      "category": "Inverter/Charger",
+      "system": "electrical",
+      "productType": "3000VA inverter/charger",
+      "dims": {
+        "l": 22.8,
+        "w": 10.9,
+        "h": 5.8
+      },
+      "weightLb": 45,
+      "priceRange": {
+        "low": 1100,
+        "high": 1400
+      },
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 250,
+        "peakAmps": 400,
+        "surgeWatts": 6000,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 400,
+        "fuseType": "Class-T",
+        "minWireAwg": "4/0 AWG",
+        "comms": "VE.Bus",
+        "switchedBy": "none",
+        "terminals": "M8 ring",
+        "inverterW": 3000,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "3000VA continuous, 120A charger, pure sine; large cable + Class-T.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Victron MultiPlus-II",
+          "url": "https://www.victronenergy.com"
+        },
+        {
+          "kind": "supplier",
+          "label": "spec via overview; verify",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "popularity": {
+        "score": 84,
+        "signal": "Common flagship inverter/charger"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Victron MultiPlus-II",
+        "url": "https://www.victronenergy.com"
+      },
+      "costUsd": 1250,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "redarc-bcdc",
+      "brand": "REDARC",
+      "model": "BCDC1240",
+      "category": "DC-DC Charger",
+      "system": "electrical",
+      "productType": "40A DC-DC charger (solar input)",
+      "dims": {
+        "l": 6.5,
+        "w": 4.7,
+        "h": 1.5
+      },
+      "weightLb": 2.2,
+      "priceRange": {
+        "low": 300,
+        "high": 400
+      },
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 40,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 50,
+        "fuseType": "MEGA",
+        "minWireAwg": "8 AWG",
+        "comms": "none",
+        "switchedBy": "none",
+        "terminals": "screw",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Alternator + solar input; common in overland builds.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "REDARC site (spec via overview; verify)",
+          "url": "https://www.redarc.com.au"
+        }
+      ],
+      "popularity": {
+        "score": 72,
+        "signal": "Rugged dual-input DC-DC (alternator + solar)"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "REDARC site (spec via overview; verify)",
+        "url": "https://www.redarc.com.au"
+      },
+      "costUsd": 350,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "renogy-dcdc-mppt",
+      "brand": "Renogy",
+      "model": "DCC50S",
+      "category": "DC-DC Charger",
+      "system": "electrical",
+      "productType": "50A DC-DC charger w/ MPPT",
+      "dims": {
+        "l": 9.6,
+        "w": 5.7,
+        "h": 3
+      },
+      "weightLb": 3.1,
+      "priceRange": {
+        "low": 250,
+        "high": 350
+      },
+      "electrical": {
+        "role": "converter",
+        "voltage": "12V",
+        "contAmps": 50,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 60,
+        "fuseType": "MEGA",
+        "minWireAwg": "6 AWG",
+        "comms": "BT",
+        "switchedBy": "none",
+        "terminals": "screw",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Combined alternator + solar input; one box.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "supplier",
+          "label": "Renogy site (spec via overview; verify)",
+          "url": "https://www.renogy.com"
+        }
+      ],
+      "popularity": {
+        "score": 74,
+        "signal": "Value DC-DC with built-in solar MPPT"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "estimated",
+      "verified": false,
+      "bestSource": {
+        "kind": "supplier",
+        "label": "Renogy site (spec via overview; verify)",
+        "url": "https://www.renogy.com"
+      },
+      "costUsd": 300,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    },
+    {
+      "id": "victron-cerbo-gx",
+      "brand": "Victron",
+      "model": "Cerbo GX MK2",
+      "category": "Monitor",
+      "system": "electrical",
+      "productType": "System monitoring hub",
+      "dims": {
+        "l": 6.06,
+        "w": 3.07,
+        "h": 1.89
+      },
+      "weightLb": 1,
+      "priceRange": {
+        "low": 300,
+        "high": 400
+      },
+      "electrical": {
+        "role": "monitor",
+        "voltage": "12V",
+        "contAmps": 1,
+        "peakAmps": null,
+        "surgeWatts": null,
+        "idleWatts": null,
+        "dailyAh": null,
+        "recommendedFuseA": 3,
+        "fuseType": "blade",
+        "minWireAwg": "18 AWG",
+        "comms": "VE.Can/WiFi",
+        "switchedBy": "none",
+        "terminals": "screw",
+        "inverterW": null,
+        "runWatts": null
+      },
+      "plumbing": null,
+      "mounting": "Pairs with GX Touch display; ties batteries/MPPT/inverter together.",
+      "compatibilityNotes": "",
+      "sources": [
+        {
+          "kind": "datasheet",
+          "label": "Victron Cerbo GX",
+          "url": "https://www.victronenergy.com"
+        }
+      ],
+      "popularity": {
+        "score": 78,
+        "signal": "Central monitoring/control hub for Victron systems"
+      },
+      "newness": {
+        "releaseYear": null,
+        "isNew": false
+      },
+      "lastChecked": "2026-06-15",
+      "confidence": "manufacturer",
+      "verified": false,
+      "bestSource": {
+        "kind": "datasheet",
+        "label": "Victron Cerbo GX",
+        "url": "https://www.victronenergy.com"
+      },
+      "costUsd": 350,
+      "missing": [],
+      "match": null,
+      "action": "add",
+      "status": "pending"
+    }
+  ]
+};
+const C = Q.candidates;
+const usd = n => n==null ? "—" : "$"+Math.round(n).toLocaleString();
+const cap = s => (s||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+const store = JSON.parse(localStorage.getItem("disc_status")||"{}");
+const save = ()=>localStorage.setItem("disc_status",JSON.stringify(store));
+
+const cats = ["all", ...[...new Set(C.map(c=>c.category))].sort()];
+const state = {status:"all", cat:"all", newOnly:false, confOnly:false};
+
+function chips(elId, vals, key, fmt){
+  const el=document.getElementById(elId); el.innerHTML="";
+  vals.forEach(v=>{
+    const b=document.createElement("button"); b.className="chip";
+    b.textContent=fmt?fmt(v):v; b.setAttribute("aria-pressed", state[key]===v);
+    b.onclick=()=>{ state[key]=v; render(); }; el.appendChild(b);
+  });
+}
+function toggleChip(elId, items){
+  const el=document.getElementById(elId); el.innerHTML="";
+  items.forEach(([key,label])=>{
+    const b=document.createElement("button"); b.className="chip"; b.textContent=label;
+    b.setAttribute("aria-pressed", state[key]); b.onclick=()=>{ state[key]=!state[key]; render(); };
+    el.appendChild(b);
+  });
+}
+
+function effStatus(c){ return store[c.id] || (c.action==="conflict" ? "conflict" : "pending"); }
+
+function visible(c){
+  const st=effStatus(c);
+  if(state.status!=="all" && st!==state.status) return false;
+  if(state.cat!=="all" && c.category!==state.cat) return false;
+  if(state.newOnly && !c.newness.isNew) return false;
+  if(state.confOnly && c.action!=="conflict") return false;
+  return true;
+}
+
+function card(c){
+  const st=effStatus(c);
+  const dims=[c.dims.l,c.dims.w,c.dims.h].every(x=>x!=null)? `${c.dims.l}×${c.dims.w}×${c.dims.h}"` : null;
+  const price = c.priceRange.low!=null && c.priceRange.high!=null && c.priceRange.low!==c.priceRange.high
+    ? `${usd(c.priceRange.low)}–${usd(c.priceRange.high)}` : usd(c.costUsd);
+  const specs=[];
+  if(dims) specs.push(`<span class="s">${dims}</span>`);
+  if(c.weightLb!=null) specs.push(`<span class="s">${c.weightLb} lb</span>`);
+  specs.push(`<span class="s">${price}</span>`);
+  if(c.electrical) specs.push(`<span class="s">${c.electrical.voltage||"?"}</span>`);
+  const miss=(c.missing||[]).map(m=>`<span class="miss">missing ${m}</span>`).join("");
+  const conf=(c.conflicts||[]).length ? `<div class="conflictbox"><div class="h">Conflict — not overwritten</div>${
+    c.conflicts.map(x=>`<div class="c">${x.field}: db <b>${x.existing}</b> vs found <b>${x.discovered}</b> — ${x.note}</div>`).join("")}</div>` : "";
+  const srcs=c.sources.map(s=>`<div class="src"><span class="skind ${s.kind}">${s.kind}</span><a href="${s.url}" target="_blank" rel="noopener">${s.label}</a>${s.kind==="community"?'<span class="popnote">popularity only</span>':''}</div>`).join("");
+  return `<section class="card ${st}" data-id="${c.id}">
+    <div class="chead">
+      <div class="ptype">${c.category} · ${c.productType}</div>
+      <div class="titlerow"><div class="title">${c.brand} ${c.model}</div>
+        <div style="display:flex;gap:5px;align-items:center">${c.newness.isNew?'<span class="new">NEW</span>':''}<span class="conf ${c.confidence}">${c.confidence}</span></div></div>
+      <div class="pop"><div class="popbar"><i style="width:${c.popularity.score}%"></i></div><span class="popnum">${c.popularity.score}</span></div>
+      <div class="popsig">${c.popularity.signal}</div>
+    </div>
+    <div class="body">
+      <div class="specs">${specs.join("")}</div>
+      ${miss?`<div class="chips2">${miss}</div>`:""}
+      ${conf}
+      <div class="srcs">${srcs}</div>
+    </div>
+    <div class="actions">
+      <span class="status ${st}">${st}</span>
+      <button class="act app ${store[c.id]==='approved'?'on':''}" data-a="approved" ${c.action==='conflict'?'disabled title="Resolve conflict first"':''}>Approve</button>
+      <button class="act rej ${store[c.id]==='rejected'?'on':''}" data-a="rejected">Reject</button>
+    </div></section>`;
+}
+
+function render(){
+  chips("statusChips",["all","pending","approved","rejected","conflict"],"status",v=>v==="all"?"All status":cap(v));
+  chips("catChips",cats,"cat",v=>v==="all"?"All categories":v);
+  toggleChip("toggleChips",[["newOnly","New releases"],["confOnly","Conflicts only"]]);
+
+  const list=C.filter(visible).sort((a,b)=> (b.popularity.score)-(a.popularity.score));
+  document.getElementById("grid").innerHTML = list.map(card).join("") || `<div class="foot">Nothing matches these filters.</div>`;
+
+  document.querySelectorAll(".act").forEach(btn=>btn.onclick=()=>{
+    const id=btn.closest(".card").dataset.id, a=btn.dataset.a;
+    if(store[id]===a) delete store[id]; else store[id]=a;
+    save(); render();
+  });
+
+  document.getElementById("s-tot").textContent=Q.summary.candidates;
+  document.getElementById("s-new").textContent=Q.summary.new_releases;
+  document.getElementById("s-con").textContent=Q.summary.conflicts;
+  document.getElementById("s-app").textContent=Object.values(store).filter(v=>v==="approved").length;
+}
+
+document.getElementById("pipe").innerHTML = Q.pipeline.map((p,i)=>`<span>${p}</span>${i<Q.pipeline.length-1?'<i>→</i>':''}`).join("");
+document.getElementById("foot").innerHTML =
+  `Approve the parts you trust, then feed them to the database: <code>python3 discovery_agent.py --apply approvals.json</code>. `+
+  `Conflicts are locked until you resolve them — verified specs are never overwritten. parts-db.json stays the single source of truth.`+
+  `<button class="chip" id="export">Export approved IDs</button>`;
+render();
+document.getElementById("export").onclick=()=>{
+  const ids=Object.keys(store).filter(k=>store[k]==="approved");
+  const txt=JSON.stringify({approved:ids,dry_run:true},null,2);
+  navigator.clipboard?.writeText(txt); alert("Copied approvals.json:\n\n"+txt);
+};
+</script>
+</body>
+</html>
