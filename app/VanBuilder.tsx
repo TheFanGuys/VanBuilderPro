@@ -3,7 +3,7 @@ import {
   Truck, Bed, ChefHat, Droplets, Sofa, Refrigerator, Battery, Zap, Sun,
   Fan, Snowflake, Flame, Archive, Box, Package, Trash2, RotateCw, Copy,
   AlertTriangle, Wrench, Plug, Waves, Scale, ChevronDown, Layers, Gauge,
-  CheckCircle2, ShieldAlert, Info, Cable, Ruler, BadgeCheck, ArrowUp, DoorOpen, Eye, EyeOff,
+  CheckCircle2, ShieldAlert, Info, Cable, Ruler, BadgeCheck, ArrowUp, DoorOpen, Eye, EyeOff, X,
 } from "lucide-react";
 
 /* ============================================================================
@@ -617,7 +617,7 @@ export default function App() {
       {ghost && <div className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-md border border-blue-400 bg-blue-500/30 px-3 py-1.5 text-xs font-medium text-blue-100 shadow-lg" style={{ left: ghost.x, top: ghost.y }}>{ghost.name}</div>}
       {toast && <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-2 text-center text-xs font-semibold text-white shadow-lg md:bottom-6">{toast}</div>}
       {setupOpen && <SetupWizard van={van} choices={setupChoices} onChange={(cat, v) => setSetupChoices((c) => ({ ...c, [cat]: v }))} onApply={applyShell} onClose={() => setSetupOpen(false)} />}
-      {rackOpen && <RackWizard cfg={rackConfig} onChange={(k, v) => setRackConfig((c) => ({ ...c, [k]: v }))} onApply={applyRack} onClose={() => setRackOpen(false)} van={van} />}
+      {rackOpen && <RackWizard cfg={rackConfig} onChange={(k, v) => setRackConfig((c) => ({ ...c, [k]: v }))} onApply={applyRack} onClose={() => setRackOpen(false)} van={van} onInfo={setPartInfo} />}
       {partInfo && <PartDetail c={DB_BY_ID[partInfo]} onClose={() => setPartInfo(null)} />}
       {elecOpen && <ElecWizard cfg={elecConfig} onChange={(k, v) => setElecConfig((c) => ({ ...c, [k]: v }))} onApply={applyElec} onClose={() => setElecOpen(false)} />}
       {plumbOpen && <PlumbWizard cfg={plumbConfig} onChange={(k, v) => setPlumbConfig((c) => ({ ...c, [k]: v }))} onApply={applyPlumb} onClose={() => setPlumbOpen(false)} />}
@@ -632,7 +632,7 @@ function SetupWizard({ van, choices, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 text-base font-semibold text-white">Set up your shell</div>
+        <div className="mb-1 flex items-center justify-between gap-2"><span className="text-base font-semibold text-white">Set up your shell</span><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
         <p className="mb-3 text-xs leading-relaxed text-slate-400">Pick insulation and coverings for the {van.name}. Quantities are estimated from the interior — walls ≈ {areas.wall} sq ft, ceiling ≈ {areas.ceiling} sq ft, floor ≈ {areas.floor} sq ft.</p>
         <div className="space-y-3">
           {SHELL_QUESTIONS.map((q) => {
@@ -968,7 +968,7 @@ function RackDiagram({ cfg, van, onChange }) {
   const overflow = cfg.solarCount > 0 && solarPos.length === 0 && cfg.solarCount > maxFit;
 
   return (
-    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="h-64 w-auto rounded-lg bg-slate-950" style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
+    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="h-64 w-auto max-w-full rounded-lg bg-slate-950" style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
       <text x={W / 2} y={12} textAnchor="middle" fontSize="9" fill="#64748b">front of van · {Math.round(roofLenIn)}×{Math.round(roofWidIn)}" roof · drag to arrange</text>
       <rect x={rx} y={ry} width={rw} height={rh} rx={Math.min(16, rw * 0.12)} fill="#0f172a" stroke="#475569" strokeWidth="2" />
       {cfg.awning && <rect x={rx + rw - 2} y={ry + rh * 0.2} width={9} height={rh * 0.5} rx={3} fill="#f97316" opacity="0.85" />}
@@ -1042,7 +1042,7 @@ function RackDiagram({ cfg, van, onChange }) {
     </svg>
   );
 }
-function RackWizard({ cfg, onChange, onApply, onClose, van }) {
+function RackWizard({ cfg, onChange, onApply, onClose, van, onInfo }) {
   const panel = DB_BY_ID[cfg.solarId];
   const watts = cfg.solarCount * ((panel && panel.capacity && panel.capacity.watts) || (SOLAR_OPTIONS.find((o) => o.value === cfg.solarId) || {}).w || 0);
   const Toggle = ({ k, label }) => (
@@ -1053,16 +1053,26 @@ function RackWizard({ cfg, onChange, onApply, onClose, van }) {
     </button>
   );
   const Step = ({ onClick, children }) => <button onPointerDown={(e) => { e.stopPropagation(); onClick(); }} className="flex h-7 w-7 items-center justify-center rounded bg-slate-700 text-base leading-none text-slate-100 active:bg-slate-600">{children}</button>;
+  const InfoBtn = ({ cid }) => (
+    <button disabled={!cid} onPointerDown={(e) => { e.stopPropagation(); if (cid && onInfo) onInfo(cid); }} title="What is this? Photo + product link"
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${cid ? "border-slate-600 bg-slate-800 text-blue-300 active:bg-slate-700" : "border-slate-800 bg-slate-900 text-slate-700"}`}><Info className="h-4 w-4" /></button>
+  );
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 text-base font-semibold text-white">Roof rack builder</div>
-        <p className="mb-3 text-xs text-slate-400">Pick a rack and what rides on it - it updates live. Adds to your BOM, not the floorplan.</p>
+        <div className="mb-1 flex items-start justify-between gap-2">
+          <div className="text-base font-semibold text-white">Roof rack builder</div>
+          <button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button>
+        </div>
+        <p className="mb-3 text-xs text-slate-400">Pick a rack and what rides on it - it updates live. Tap ⓘ next to any pick to see a photo + product link. Adds to your BOM, not the floorplan.</p>
         <div className="mb-3 flex justify-center"><RackDiagram cfg={cfg} van={van} onChange={onChange} /></div>
         <div className="space-y-3">
           <div>
             <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Base rack</div>
-            <Selectish value={cfg.base} onChange={(v) => onChange("base", v)} options={[{ value: "", label: "— None —" }, ...RACK_BASE_OPTIONS]} />
+            <div className="flex items-center gap-2">
+              <div className="flex-1"><Selectish value={cfg.base} onChange={(v) => onChange("base", v)} options={[{ value: "", label: "— None —" }, ...RACK_BASE_OPTIONS]} /></div>
+              <InfoBtn cid={cfg.base} />
+            </div>
           </div>
           <div>
             <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Solar panels</div>
@@ -1073,6 +1083,7 @@ function RackWizard({ cfg, onChange, onApply, onClose, van }) {
                 <Step onClick={() => onChange("solarCount", Math.min(8, cfg.solarCount + 1))}>+</Step>
               </div>
               <div className="flex-1"><Selectish value={cfg.solarId} onChange={(v) => onChange("solarId", v)} options={SOLAR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} /></div>
+              <InfoBtn cid={cfg.solarId} />
               <button onPointerDown={(e) => { e.stopPropagation(); onChange("solarLandscape", !cfg.solarLandscape); }}
                 className={`flex h-9 shrink-0 items-center gap-1 rounded-md border px-2.5 text-xs font-medium ${cfg.solarLandscape ? "border-blue-400 bg-blue-500/15 text-blue-100" : "border-slate-700 bg-slate-800 text-slate-300"}`}>
                 <RotateCw className="h-3.5 w-3.5" />{cfg.solarLandscape ? "Sideways" : "Lengthwise"}
@@ -1085,14 +1096,17 @@ function RackWizard({ cfg, onChange, onApply, onClose, van }) {
           </div>
           <div>
             <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Roof A/C</div>
-            <Selectish value={cfg.acId} onChange={(v) => onChange("acId", v)} options={[{ value: "", label: "None" }, ...AC_OPTIONS]} />
+            <div className="flex items-center gap-2">
+              <div className="flex-1"><Selectish value={cfg.acId} onChange={(v) => onChange("acId", v)} options={[{ value: "", label: "None" }, ...AC_OPTIONS]} /></div>
+              <InfoBtn cid={cfg.acId} />
+            </div>
             {cfg.acId && <div className="mt-1 text-[10px] text-slate-500">Drag the A/C on the diagram. It eats roof space — watch your panels.</div>}
           </div>
           <div className="space-y-2">
             <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Lighting</div>
-            <Selectish value={cfg.lightBarId} onChange={(v) => onChange("lightBarId", v)} options={[{ value: "", label: "Front light bar — None" }, ...LIGHTBAR_OPTIONS]} />
-            <Selectish value={cfg.podsId} onChange={(v) => onChange("podsId", v)} options={[{ value: "", label: "Ditch / scene pods — None" }, ...POD_OPTIONS]} />
-            <Selectish value={cfg.rearId} onChange={(v) => onChange("rearId", v)} options={[{ value: "", label: "Rear lights — None" }, ...REAR_OPTIONS]} />
+            <div className="flex items-center gap-2"><div className="flex-1"><Selectish value={cfg.lightBarId} onChange={(v) => onChange("lightBarId", v)} options={[{ value: "", label: "Front light bar — None" }, ...LIGHTBAR_OPTIONS]} /></div><InfoBtn cid={cfg.lightBarId} /></div>
+            <div className="flex items-center gap-2"><div className="flex-1"><Selectish value={cfg.podsId} onChange={(v) => onChange("podsId", v)} options={[{ value: "", label: "Ditch / scene pods — None" }, ...POD_OPTIONS]} /></div><InfoBtn cid={cfg.podsId} /></div>
+            <div className="flex items-center gap-2"><div className="flex-1"><Selectish value={cfg.rearId} onChange={(v) => onChange("rearId", v)} options={[{ value: "", label: "Rear lights — None" }, ...REAR_OPTIONS]} /></div><InfoBtn cid={cfg.rearId} /></div>
             {[cfg.podsId, cfg.rearId, cfg.lightBarId].some((id) => id && BRACKET_REQ_IDS.has(id)) &&
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-300">These lights need a mounting bracket — add one from Exterior → Lighting Bracket in the catalog.</div>}
           </div>
@@ -1204,7 +1218,7 @@ function ElecWizard({ cfg, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center gap-2"><Zap className="h-4 w-4 text-amber-400" /><span className="text-base font-semibold text-white">Electrical system sizer</span></div>
+        <div className="mb-1 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Zap className="h-4 w-4 text-amber-400" /><span className="text-base font-semibold text-white">Electrical system sizer</span></div><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
         <p className="mb-3 text-xs text-slate-400">Describe the system. It sizes fuses, wire, breakers, and busbars and adds them to your BOM. A starting point - you verify against ABYC E-11 / NEC / RVIA.</p>
         <div className="space-y-3">
           <div>
@@ -1321,7 +1335,7 @@ function PlumbWizard({ cfg, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center gap-2"><Droplets className="h-4 w-4 text-sky-400" /><span className="text-base font-semibold text-white">Plumbing system</span></div>
+        <div className="mb-1 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Droplets className="h-4 w-4 text-sky-400" /><span className="text-base font-semibold text-white">Plumbing system</span></div><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
         <p className="mb-3 text-xs text-slate-400">Pick tanks, pump, and hot water. It builds the plumbing parts list. Drop the plumbing cabinet from the catalog to give it a floorplan spot.</p>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
@@ -1357,7 +1371,7 @@ function ShowerWizard({ cfg, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center gap-2"><Waves className="h-4 w-4 text-cyan-400" /><span className="text-base font-semibold text-white">Shower</span></div>
+        <div className="mb-1 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Waves className="h-4 w-4 text-cyan-400" /><span className="text-base font-semibold text-white">Shower</span></div><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
         <p className="mb-3 text-xs text-slate-400">Choose the shower style and how it drains. It builds the shower parts list. Drop the wet bath / shower from the catalog to place it on the floorplan.</p>
         <div className="space-y-3">
           <div>
