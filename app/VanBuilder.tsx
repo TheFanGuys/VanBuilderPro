@@ -384,16 +384,29 @@ function CatRow({ icon: Icon, label, count, active, onClick }) {
     </button>
   );
 }
-function CatCard({ c, onAdd, onInfo }) {
+function CatCard({ c, onAdd, onInfo, onDragStart }) {
   const Icon = c.icon || Box;
   return (
-    <div className="group relative flex flex-col rounded-lg border border-slate-800 bg-slate-800/40 p-2.5 transition hover:border-slate-600 hover:bg-slate-800">
-      <button onClick={() => onAdd(c.id)} className="flex flex-1 flex-col items-start gap-1.5 text-left">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-900"><Icon className="h-5 w-5 text-slate-300 group-hover:text-blue-400" /></span>
-        <span className="line-clamp-2 text-xs font-medium leading-tight text-slate-200">{c.name}</span>
-        <span className="flex items-center gap-1 font-mono text-[10px] text-slate-500">{c.weight != null ? c.weight + " lb" : "? lb"}{c.needsReview && <span title="Needs review" className="h-1.5 w-1.5 rounded-full bg-amber-400" />}</span>
+    <div className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-800/40 transition hover:border-slate-600 hover:bg-slate-800">
+      <button
+        onPointerDown={onDragStart ? (e) => onDragStart(c.id, e) : undefined}
+        onClick={() => onAdd(c.id)}
+        className="flex flex-1 flex-col text-left"
+      >
+        <span className="relative flex h-20 items-center justify-center border-b border-slate-800/80 bg-gradient-to-b from-slate-800/70 to-slate-900/60">
+          <span className={`flex h-11 w-11 items-center justify-center rounded-lg ${FILL[c.color] || "border border-slate-700 bg-slate-800"}`}><Icon className="h-6 w-6 text-slate-100" /></span>
+          {c.elec && <Zap className="absolute left-2 top-2 h-3.5 w-3.5 text-amber-400/80" />}
+          {c.needsReview && <span title="Specs need review" className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-400" />}
+        </span>
+        <span className="flex flex-1 flex-col gap-1 p-2.5">
+          <span className="line-clamp-2 text-[13px] font-medium leading-tight text-slate-100">{c.name}</span>
+          <span className="mt-auto flex items-center justify-between font-mono text-[10px] text-slate-500">
+            <span>{c.weight != null ? c.weight + " lb" : "— lb"}</span>
+            <span className="text-slate-400">{c.cost != null ? usd(c.cost) : ""}</span>
+          </span>
+        </span>
       </button>
-      <button onClick={() => onInfo(c.id)} title="Details" className="absolute right-1.5 top-1.5 rounded p-0.5 text-slate-500 opacity-0 transition group-hover:opacity-100 hover:text-blue-300"><Info className="h-3.5 w-3.5" /></button>
+      <button onClick={() => onInfo(c.id)} title="Details" className="absolute right-1.5 top-1.5 z-10 rounded-md bg-slate-900/70 p-1 text-slate-400 opacity-0 transition hover:text-blue-300 group-hover:opacity-100"><Info className="h-3.5 w-3.5" /></button>
     </div>
   );
 }
@@ -408,17 +421,23 @@ function MobileTopBar({ van, stats, reviewCount, onHome, onOpenVan }) {
   const payTone = !van.payloadKnown ? "muted" : over ? "red" : stats.remaining < van.payload * 0.15 ? "amber" : "emerald";
   return (
     <header className="shrink-0 border-b border-slate-800 bg-slate-900">
-      <div className="flex items-center gap-2.5 px-4 pb-2 pt-3">
-        <button onClick={onHome} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-600"><Truck className="h-5 w-5 text-white" /></button>
-        <button onClick={onOpenVan} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-white">{van.name}</div>
-            <div className="truncate text-[11px] text-slate-400">{van.roof_label}</div>
-          </div>
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+      <div className="flex items-center gap-2.5 px-4 pb-1.5 pt-2.5">
+        <button onClick={onHome} className="flex shrink-0 items-center gap-2 text-left">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600"><Truck className="h-5 w-5 text-white" /></span>
+          <span className="text-[15px] font-bold tracking-tight text-white">VanBuilder</span>
         </button>
-        {reviewCount > 0 && <span className="flex shrink-0 items-center gap-1 rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300"><AlertTriangle className="h-3 w-3" /> {reviewCount}</span>}
+        <span className="relative ml-auto flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-800/60 text-slate-400">
+          <Bell className="h-4 w-4" />{reviewCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-slate-900">{reviewCount}</span>}
+        </span>
       </div>
+      <button onClick={onOpenVan} className="flex w-full items-center gap-2.5 px-4 pb-2 text-left">
+        <span className="flex h-9 w-11 shrink-0 items-center justify-center rounded-md bg-slate-800"><Truck className="h-5 w-5 text-slate-400" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-white">{van.name}</span>
+          <span className="block truncate text-[11px] text-slate-400">{van.roof_label} · {van.intLength}" cargo</span>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+      </button>
       <div className="grid grid-cols-3 gap-px border-t border-slate-800 bg-slate-800">
         <MobileStat label="Payload left" value={van.payloadKnown ? lb(stats.remaining) : "verify"} tone={payTone} />
         <MobileStat label="Weight" value={lb(stats.total)} />
@@ -431,9 +450,9 @@ function MobileVanPicker({ van, onClose, onPickModel, onSetVan }) {
   const curGroup = `${van.make}|${van.model}`;
   const configs = MODEL_GROUPS.find((g) => g.key === curGroup)?.ids || [];
   return (
-    <div className="fixed inset-0 z-[60] flex items-end bg-black/60" onPointerDown={onClose}>
-      <div className="w-full rounded-t-2xl border border-slate-700 bg-slate-900 p-4" onPointerDown={(e) => e.stopPropagation()} style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-700" />
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center bg-black/60 sm:p-6" onPointerDown={onClose}>
+      <div className="w-full rounded-t-2xl border border-slate-700 bg-slate-900 p-4 sm:max-w-sm sm:rounded-2xl" onPointerDown={(e) => e.stopPropagation()} style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-700 sm:hidden" />
         <div className="mb-3 text-sm font-semibold text-white">Choose your van</div>
         <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">Model</div>
         <div className="mb-3"><Selectish value={curGroup} onChange={onPickModel} options={MODEL_GROUPS.map((g) => ({ value: g.key, label: `${g.make} ${g.model}` }))} /></div>
@@ -465,17 +484,43 @@ function MobileNav({ mview, onNav }) {
   );
 }
 function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onHide, onDup, onRemove, onResize }) {
+  const [dragH, setDragH] = useState(null);
+  const dragRef = useRef(null);
   if (!it) return null;
   const c = it.c, Icon = c.icon || Box;
-  const heightClass = pos === "full" ? "h-[88%]" : pos === "half" ? "h-[46%]" : "h-auto";
+  const vh = (typeof window !== "undefined" && window.innerHeight) ? window.innerHeight : 800;
+  const COLLAPSED = 104, HALF = Math.round(vh * 0.5), FULL = Math.round(vh * 0.9);
+  const snapPx = pos === "full" ? FULL : pos === "half" ? HALF : COLLAPSED;
+  const height = dragH != null ? dragH : snapPx;
+  const expanded = height > COLLAPSED + 48;
   const g = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
   const gi = (q) => `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`;
   const q = [c.brand, c.model || c.name].filter(Boolean).join(" ");
   const cycle = () => setPos(pos === "collapsed" ? "half" : pos === "half" ? "full" : "collapsed");
+  const onHandleDown = (e) => {
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
+    dragRef.current = { startY: e.clientY, base: snapPx, moved: false };
+    setDragH(snapPx);
+  };
+  const onHandleMove = (e) => {
+    const d = dragRef.current; if (!d) return;
+    if (Math.abs(d.startY - e.clientY) > 6) d.moved = true;
+    setDragH(Math.max(COLLAPSED, Math.min(FULL, d.base + (d.startY - e.clientY))));
+  };
+  const onHandleUp = (e) => {
+    const d = dragRef.current; if (!d) return;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (er) {}
+    if (!d.moved) { cycle(); dragRef.current = null; setDragH(null); return; }
+    const h = dragH != null ? dragH : d.base;
+    const targets = [["collapsed", COLLAPSED], ["half", HALF], ["full", FULL]];
+    let best = targets[0]; for (const t of targets) if (Math.abs(t[1] - h) < Math.abs(best[1] - h)) best = t;
+    setPos(best[0]); dragRef.current = null; setDragH(null);
+  };
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex max-h-full flex-col justify-end">
-      <div className={`pointer-events-auto flex min-h-0 flex-col rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl ${heightClass}`}>
-        <button onClick={cycle} className="flex shrink-0 justify-center pb-1 pt-2"><span className="h-1 w-10 rounded-full bg-slate-600" /></button>
+      <div className={`pointer-events-auto flex min-h-0 flex-col overflow-hidden rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl ${dragH == null ? "transition-[height] duration-300 ease-out" : ""}`} style={{ height }}>
+        <div onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} className="flex shrink-0 cursor-grab touch-none justify-center pb-1.5 pt-2.5 active:cursor-grabbing" style={{ touchAction: "none" }}><span className="h-1.5 w-10 rounded-full bg-slate-600" /></div>
         <div className="flex shrink-0 items-center gap-2 px-4 pb-2">
           <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${DOT[c.color]} bg-opacity-20`}><Icon className="h-4 w-4 text-slate-100" /></span>
           <div className="min-w-0 flex-1" onClick={cycle}>
@@ -485,7 +530,7 @@ function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onH
           {c.needsReview && <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">Needs review</span>}
           <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-800 text-slate-400 active:bg-slate-700"><span className="text-base leading-none">✕</span></button>
         </div>
-        {pos !== "collapsed" && (
+        {expanded && (
           <>
             <div className="flex shrink-0 gap-1 border-b border-slate-800 px-3">
               {["Details", "Mounting", "Notes", "Sources"].map((t) => (
@@ -617,7 +662,7 @@ function TabletFrame({ catalog, canvas, rightRail, detailsOpen, setDetailsOpen, 
       {canvas("flex min-w-0 flex-1")}
       <button
         onClick={() => setDetailsOpen((o) => !o)}
-        className="absolute right-0 top-3 z-10 flex items-center gap-1 rounded-l-md border border-r-0 border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] font-medium text-slate-300 shadow-lg active:bg-slate-800"
+        className="absolute right-0 top-16 z-10 flex items-center gap-1 rounded-l-md border border-r-0 border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] font-medium text-slate-300 shadow-lg active:bg-slate-800"
       >
         <Wrench className="h-3.5 w-3.5" /> {detailsOpen ? "Close" : (hasSelection ? "Details" : "Build")}
       </button>
@@ -734,6 +779,47 @@ export default function App() {
   const canvasRef = useRef(null);
   const mScrollRef = useRef(null);
 
+  // ---- Responsive canvas: scale the floorplan to fill its viewport ---------
+  // The floorplan was locked at a fixed px-per-inch, leaving the canvas mostly
+  // empty. We measure the live canvas viewport and pick the largest px-per-inch
+  // that still fits (reserving room for the plan's labels/headers), so the
+  // floorplan dominates the workspace on every device.
+  const fitScaleRef = useRef(PX_PER_IN);
+  const [fitScale, setFitScale] = useState(PX_PER_IN);
+  const canvasViewportRef = useRef(null);
+  const recomputeFit = useCallback(() => {
+    const el = canvasViewportRef.current;
+    if (!el) return;
+    let cs; try { cs = getComputedStyle(el); } catch (e) { cs = null; }
+    const padX = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 24;
+    const padY = cs ? (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) : 24;
+    const availW = (el.clientWidth || 0) - padX;
+    const availH = (el.clientHeight || 0) - padY;
+    if (availW <= 0 || availH <= 0) return;          // not laid out yet (e.g. jsdom)
+    const CHROME_W = 64, CHROME_H = 112;             // side labels + cab/rear-door chrome
+    const wBudget = Math.max(40, availW - CHROME_W);
+    const hBudget = Math.max(40, availH - CHROME_H);
+    let s = Math.min(wBudget / van.intWidth, hBudget / van.intLength);
+    if (!isFinite(s) || s <= 0) return;
+    s = Math.max(2.4, Math.min(s, 9));               // never tinier than before, never absurd
+    s = Math.floor(s * 100) / 100;                   // floor so it never overflows the viewport
+    if (Math.abs(s - fitScaleRef.current) < 0.01) return;
+    fitScaleRef.current = s;
+    setFitScale(s);
+  }, [van.intWidth, van.intLength]);
+  const fitRO = useRef(null);
+  const setCanvasViewport = useCallback((node) => {
+    if (fitRO.current) { fitRO.current.disconnect(); fitRO.current = null; }
+    canvasViewportRef.current = node;
+    if (node && typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => recomputeFit());
+      ro.observe(node); fitRO.current = ro;
+    }
+    recomputeFit();
+  }, [recomputeFit]);
+  const setMobileViewport = useCallback((node) => { mScrollRef.current = node; setCanvasViewport(node); }, [setCanvasViewport]);
+  useEffect(() => { recomputeFit(); }, [recomputeFit, bp, screen, vanDbOpen, planPanelOpen, tab]);
+
   const items = useMemo(() => placed.map((p) => {
     const c = DB_BY_ID[p.cid]; const f = fp(c);
     const bw = p.wIn ?? f.w, bl = p.lIn ?? f.l;
@@ -779,7 +865,8 @@ export default function App() {
 
   const place = useCallback((cid, cx, cy, centered) => {
     const r = canvasRef.current.getBoundingClientRect(); const c = DB_BY_ID[cid]; const f = fp(c);
-    let x = (cx - r.left) / PX_PER_IN, y = (cy - r.top) / PX_PER_IN;
+    const S = fitScaleRef.current;
+    let x = (cx - r.left) / S, y = (cy - r.top) / S;
     if (centered) { x -= f.w / 2; y -= f.l / 2; }
     return { x, y };
   }, []);
@@ -788,7 +875,8 @@ export default function App() {
     e.preventDefault(); e.stopPropagation(); setSelectedIid(iid);
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
     const p = placed.find((q) => q.iid === iid); const r = canvasRef.current.getBoundingClientRect();
-    setDrag({ kind: "move", iid, grabX: (e.clientX - r.left) / PX_PER_IN - p.x, grabY: (e.clientY - r.top) / PX_PER_IN - p.y });
+    const S = fitScaleRef.current;
+    setDrag({ kind: "move", iid, grabX: (e.clientX - r.left) / S - p.x, grabY: (e.clientY - r.top) / S - p.y });
   };
   useEffect(() => {
     if (!drag) return;
@@ -796,7 +884,8 @@ export default function App() {
       if (drag.kind === "new") setGhost({ x: e.clientX, y: e.clientY, name: DB_BY_ID[drag.cid].name });
       else {
         const r = canvasRef.current.getBoundingClientRect();
-        const nx = (e.clientX - r.left) / PX_PER_IN - drag.grabX, ny = (e.clientY - r.top) / PX_PER_IN - drag.grabY;
+        const S = fitScaleRef.current;
+        const nx = (e.clientX - r.left) / S - drag.grabX, ny = (e.clientY - r.top) / S - drag.grabY;
         setPlaced((ps) => ps.map((p) => {
           if (p.iid !== drag.iid) return p;
           const c = DB_BY_ID[p.cid];
@@ -885,6 +974,62 @@ export default function App() {
   if (screen === "landing") return <Landing hasSave={hasSave} onContinue={continueBuild} onNew={() => setScreen("select")} />;
   if (screen === "select") return <SelectVan onPick={startNewBuild} onBack={() => setScreen("landing")} />;
 
+  // Shared, visual parts browser (search + categories + recently used + card
+  // grid). Reused by phone, tablet and desktop so the catalog is consistent and
+  // scannable everywhere.
+  const catalogBrowse = (cols = "grid-cols-2") => {
+    const q = catSearch.trim().toLowerCase();
+    const allParts = grouped.flatMap((g) => g.list);
+    const searchHits = q ? allParts.filter((c) => `${c.name} ${c.brand} ${c.category}`.toLowerCase().includes(q)) : [];
+    const activeList = catFilter === "all" ? [] : (grouped.find((g) => g.sys === catFilter)?.list || []);
+    const recentCards = recentIds.map((id) => DB_BY_ID[id]).filter(Boolean);
+    const card = (c) => <CatCard key={c.id} c={c} onAdd={addToCenter} onInfo={setPartInfo} onDragStart={startNew} />;
+    return (
+      <>
+        <div className="mb-2">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5">
+            <Search className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+            <input value={catSearch} onChange={(e) => setCatSearch(e.target.value)} placeholder="Search parts..." className="w-full bg-transparent py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none" />
+            {catSearch && <button onClick={() => setCatSearch("")} className="text-slate-500 hover:text-slate-300">✕</button>}
+          </div>
+        </div>
+        {q ? (
+          <>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{searchHits.length} result{searchHits.length === 1 ? "" : "s"}</div>
+            <div className={`grid ${cols} gap-2`}>{searchHits.slice(0, 60).map(card)}</div>
+            {searchHits.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No parts match your search.</p>}
+          </>
+        ) : (
+          <>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Categories</div>
+            <div className="space-y-0.5">
+              <CatRow icon={Package} label="All Parts" count={allParts.length} active={catFilter === "all"} onClick={() => setCatFilter("all")} />
+              {grouped.map((g) => <CatRow key={g.sys} icon={SYS_ICON[g.sys] || Box} label={SYS_LABEL[g.sys]} count={g.list.length} active={catFilter === g.sys} onClick={() => setCatFilter(g.sys)} />)}
+            </div>
+            {catFilter === "all" ? (
+              recentCards.length > 0 ? (
+                <>
+                  <div className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Recently Used</div>
+                  <div className={`grid ${cols} gap-2`}>{recentCards.map(card)}</div>
+                </>
+              ) : (
+                <p className="mt-4 rounded-lg border border-dashed border-slate-700 px-3 py-4 text-center text-xs text-slate-500">Pick a category to browse parts. Tap a part to drop it on the floorplan.</p>
+              )
+            ) : (
+              <>
+                <div className="mb-2 mt-4 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{SYS_LABEL[catFilter]}</span>
+                  <button onClick={() => setCatFilter("all")} className="text-[11px] text-blue-400">All parts</button>
+                </div>
+                <div className={`grid ${cols} gap-2`}>{activeList.map(card)}</div>
+              </>
+            )}
+          </>
+        )}
+      </>
+    );
+  };
+
   const catalogPanel = (cls) => (
     <aside className={`min-h-0 flex-col border-r border-slate-800 bg-slate-900 ${cls}`}>
       <button onClick={() => setVanDbOpen((o) => !o)} className="flex w-full items-center gap-1.5 px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -907,68 +1052,22 @@ export default function App() {
       <button onClick={openElec} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Zap className="h-3.5 w-3.5" /> Electrical sizer{placed.some((p) => p.elec) ? " ✓" : ""}</button>
       <button onClick={() => setPlumbOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Droplets className="h-3.5 w-3.5" /> Plumbing{placed.some((p) => p.plumb) ? " ✓" : ""}</button>
       <button onClick={() => setShowerOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Waves className="h-3.5 w-3.5" /> Shower{placed.some((p) => p.shower) ? " ✓" : ""}</button>
-      <SectionLabel icon={Package} text="Parts database" />
-      <p className="px-3 pb-2 text-[11px] text-slate-500">Tap a system to open it, then a category. Tap a part to add - tap again for more.</p>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        <Catalog grouped={grouped} onTap={addToCenter} onDragStart={startNew} onInfo={setPartInfo} />
+      <SectionLabel icon={Package} text="Parts catalog" />
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        {catalogBrowse("grid-cols-2")}
+      </div>
+      <div className="border-t border-slate-800 p-3">
+        <button onClick={() => flashToast("Custom parts are coming soon")} className="flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white active:bg-blue-700"><Plus className="h-4 w-4" /> Add Custom Part</button>
       </div>
     </aside>
   );
 
   const tabletCatalogPanel = (cls) => {
-    const q = catSearch.trim().toLowerCase();
-    const allParts = grouped.flatMap((g) => g.list);
-    const searchHits = q ? allParts.filter((c) => `${c.name} ${c.brand} ${c.category}`.toLowerCase().includes(q)) : [];
-    const activeList = catFilter === "all" ? [] : (grouped.find((g) => g.sys === catFilter)?.list || []);
-    const recentCards = recentIds.map((id) => DB_BY_ID[id]).filter(Boolean);
     return (
       <aside className={`min-h-0 flex-col border-r border-slate-800 bg-slate-900 ${cls}`}>
         <div className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Parts Catalog</div>
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800/60 px-2.5">
-            <Search className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-            <input value={catSearch} onChange={(e) => setCatSearch(e.target.value)} placeholder="Search parts..." className="w-full bg-transparent py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none" />
-            {catSearch && <button onClick={() => setCatSearch("")} className="text-slate-500 hover:text-slate-300">✕</button>}
-          </div>
-        </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-          {q ? (
-            <>
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{searchHits.length} result{searchHits.length === 1 ? "" : "s"}</div>
-              <div className="grid grid-cols-2 gap-2">{searchHits.slice(0, 60).map((c) => <CatCard key={c.id} c={c} onAdd={addToCenter} onInfo={setPartInfo} />)}</div>
-              {searchHits.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No parts match your search.</p>}
-            </>
-          ) : (
-            <>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Categories</div>
-              <div className="space-y-0.5">
-                <CatRow icon={Package} label="All Parts" count={allParts.length} active={catFilter === "all"} onClick={() => setCatFilter("all")} />
-                {grouped.map((g) => <CatRow key={g.sys} icon={SYS_ICON[g.sys] || Box} label={SYS_LABEL[g.sys]} count={g.list.length} active={catFilter === g.sys} onClick={() => setCatFilter(g.sys)} />)}
-              </div>
-              {catFilter === "all" ? (
-                recentCards.length > 0 ? (
-                  <>
-                    <div className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Recently Used</div>
-                    <div className="space-y-1">{recentCards.map((c) => { const Icon = c.icon || Box; return (
-                      <button key={c.id} onClick={() => addToCenter(c.id)} className="flex w-full items-center gap-2 rounded-md border border-slate-800 bg-slate-800/40 px-2.5 py-2 text-left hover:border-slate-600 hover:bg-slate-800">
-                        <Icon className="h-4 w-4 shrink-0 text-slate-400" /><span className="flex-1 truncate text-xs text-slate-200">{c.name}</span>
-                      </button>
-                    ); })}</div>
-                  </>
-                ) : (
-                  <p className="mt-4 rounded-md border border-dashed border-slate-700 px-3 py-4 text-center text-xs text-slate-500">Pick a category to browse parts. Tap a part to drop it on the floorplan.</p>
-                )
-              ) : (
-                <>
-                  <div className="mb-1.5 mt-4 flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{SYS_LABEL[catFilter]}</span>
-                    <button onClick={() => setCatFilter("all")} className="text-[11px] text-blue-400">All parts</button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">{activeList.map((c) => <CatCard key={c.id} c={c} onAdd={addToCenter} onInfo={setPartInfo} />)}</div>
-                </>
-              )}
-            </>
-          )}
+          {catalogBrowse("grid-cols-2")}
         </div>
         <div className="border-t border-slate-800 p-3">
           <button onClick={() => flashToast("Custom parts are coming soon")} className="flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white active:bg-blue-700"><Plus className="h-4 w-4" /> Add Custom Part</button>
@@ -998,8 +1097,8 @@ export default function App() {
   const canvasPanel = (cls) => (
     <main data-view={canvasView} className={`min-w-0 flex-col bg-slate-950 ${cls}`}>
       {bp !== "phone" && <CanvasToolbar tool={tool} setTool={setTool} canvasView={canvasView} onComingSoon={(f) => flashToast(f + " is coming soon")} />}
-      <div className={`flex min-h-0 flex-1 items-start justify-center overscroll-none p-3 md:items-center md:p-6 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
-        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} onStartMove={startMove} onSelect={(iid) => { setSelectedIid(iid); setPlanPanelOpen(true); }} />
+      <div ref={setCanvasViewport} className={`flex min-h-0 flex-1 items-center justify-center overscroll-none p-3 md:p-6 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
+        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={fitScale} onStartMove={startMove} onSelect={(iid) => { setSelectedIid(iid); setPlanPanelOpen(true); }} />
       </div>
       {items.some((it) => it.hidden) && <button onClick={showAll} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400 md:hidden"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
       <button onClick={() => setPlanPanelOpen((o) => !o)} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-slate-400 md:hidden">
@@ -1039,6 +1138,7 @@ export default function App() {
   );
 
   const fitCanvas = () => {
+    recomputeFit();
     const el = mScrollRef.current;
     if (!el) return;
     el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
@@ -1049,8 +1149,8 @@ export default function App() {
   const mobileCanvas = (
     <main data-view={canvasView} className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-slate-950">
       <MobileViewBar label={mview === "layout" ? "Layout" : mview} onFit={fitCanvas} />
-      <div ref={mScrollRef} className={`flex min-h-0 flex-1 items-start justify-center overscroll-none p-3 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
-        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} onStartMove={startMove} onSelect={setSelectedIid} />
+      <div ref={setMobileViewport} className={`flex min-h-0 flex-1 items-start justify-center overscroll-none p-3 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
+        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={fitScale} onStartMove={startMove} onSelect={setSelectedIid} />
       </div>
       {items.some((it) => it.hidden) && <button onClick={showAll} className="flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
       <div className="pointer-events-none absolute right-3 top-12 z-10 flex flex-col gap-2">
@@ -1077,7 +1177,7 @@ export default function App() {
   const mobileNav = <MobileNav mview={mview} onNav={(k) => { setMview(k); setAppMode(k); }} />;
 
   const frame =
-    bp === "phone"  ? <PhoneFrame mview={mview} parts={catalogPanel("flex w-full")} layoutCanvas={mobileCanvas} build={mobileBuild} review={mobileReviewView} sheet={mobileSheet} nav={mobileNav} />
+    bp === "phone"  ? <PhoneFrame mview={mview} parts={tabletCatalogPanel("flex w-full")} layoutCanvas={mobileCanvas} build={mobileBuild} review={mobileReviewView} sheet={mobileSheet} nav={mobileNav} />
     : bp === "tablet" ? <TabletFrame catalog={tabletCatalogPanel} canvas={canvasPanel} rightRail={rightRailPanel} detailsOpen={detailsOpen} setDetailsOpen={setDetailsOpen} hasSelection={!!selected} />
     :                   <DesktopFrame catalog={catalogPanel} canvas={canvasPanel} rightRail={rightRailPanel} />;
 
@@ -1085,10 +1185,10 @@ export default function App() {
     <div data-mode={appMode} data-bp={bp} data-sheet={sheetPos} className="flex h-screen [height:100dvh] w-full flex-col overflow-hidden bg-slate-950 font-sans text-slate-200 antialiased" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {bp === "phone"
         ? <MobileTopBar van={van} stats={stats} reviewCount={reviewCount} onHome={() => setScreen("landing")} onOpenVan={() => setVanPickerOpen(true)} />
-        : <TopBar van={van} stats={stats} axle={axle} reviewCount={reviewCount} onHome={() => setScreen("landing")} />}
+        : <TopBar van={van} stats={stats} axle={axle} reviewCount={reviewCount} onHome={() => setScreen("landing")} onOpenVan={() => setVanPickerOpen(true)} bp={bp} />}
       {frame}
 
-      {vanPickerOpen && bp === "phone" && <MobileVanPicker van={van} onClose={() => setVanPickerOpen(false)} onPickModel={pickModel} onSetVan={setVanId} />}
+      {vanPickerOpen && <MobileVanPicker van={van} onClose={() => setVanPickerOpen(false)} onPickModel={pickModel} onSetVan={setVanId} />}
       {ghost && <div className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-md border border-blue-400 bg-blue-500/30 px-3 py-1.5 text-xs font-medium text-blue-100 shadow-lg" style={{ left: ghost.x, top: ghost.y }}>{ghost.name}</div>}
       {toast && <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-2 text-center text-xs font-semibold text-white shadow-lg md:bottom-6">{toast}</div>}
       {setupOpen && <SetupWizard van={van} choices={setupChoices} onChange={(cat, v) => setSetupChoices((c) => ({ ...c, [cat]: v }))} onApply={applyShell} onClose={() => setSetupOpen(false)} />}
@@ -1964,22 +2064,50 @@ function SelectVan({ onPick, onBack }) {
 }
 
 /* ========================================================================== */
-function TopBar({ stats, van, axle, reviewCount, onHome }) {
+function TopBar({ stats, van, axle, reviewCount, onHome, onOpenVan, bp }) {
   const over = stats.remaining != null && stats.remaining < 0;
+  const payTone = !van.payloadKnown ? "muted" : over ? "red" : stats.remaining < van.payload * 0.15 ? "amber" : "emerald";
   return (
-    <header className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-2.5">
-      <button onClick={onHome} className="flex items-center gap-2.5 text-left">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600"><Truck className="h-4 w-4 text-white" /></div>
-        <div className="leading-none"><div className="text-sm font-bold tracking-tight text-white">VanBuilder</div><div className="text-[10px] uppercase tracking-widest text-slate-500">{van.name} · {van.roof_label}</div></div>
+    <header className="flex shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900 px-3 py-2.5 sm:px-4">
+      <button onClick={onHome} title="Home" className="flex shrink-0 items-center gap-2.5 text-left">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 shadow-sm"><Truck className="h-5 w-5 text-white" /></div>
+        <div className="hidden leading-none sm:block"><div className="text-[15px] font-bold tracking-tight text-white">VanBuilder</div><div className="text-[10px] font-medium uppercase tracking-widest text-slate-500">Build planner</div></div>
       </button>
-      <div className="flex items-center gap-3 sm:gap-5">
-        {reviewCount > 0 && <span className="flex items-center gap-1 rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300"><AlertTriangle className="h-3 w-3" /> {reviewCount} to verify</span>}
-        <HeaderStat label="Weight" value={lb(stats.total)} />
-        <HeaderStat label="Cost" value={usd(stats.cost)} />
-        {van.payloadKnown ? <HeaderStat label="Payload left" value={lb(stats.remaining)} tone={over ? "red" : stats.remaining < van.payload * 0.15 ? "amber" : "emerald"} />
-          : <HeaderStat label="Payload left" value="verify" tone="muted" />}
+
+      <button onClick={onOpenVan} title="Change van" className="flex min-w-0 items-center gap-2.5 rounded-lg border border-slate-700 bg-slate-800/70 py-1.5 pl-2 pr-2.5 text-left transition hover:border-slate-600 hover:bg-slate-800">
+        <span className="flex h-8 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900/80"><Truck className="h-4 w-4 text-slate-400" /></span>
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-semibold text-white">{van.name}</span>
+          <span className="block truncate text-[10px] uppercase tracking-wide text-slate-400">{van.roof_label} · {van.intLength}" cargo</span>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+      </button>
+
+      <div className="ml-auto flex items-center gap-2 sm:gap-2.5">
+        {reviewCount > 0 && <span className="hidden items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] font-medium text-amber-300 md:flex"><AlertTriangle className="h-3.5 w-3.5" /> {reviewCount} to verify</span>}
+        <StatChip label="Payload left" value={van.payloadKnown ? lb(stats.remaining) : "verify"} tone={payTone} />
+        <StatChip label="Weight" value={lb(stats.total)} />
+        <StatChip label="Cost" value={usd(stats.cost)} />
+        {bp === "desktop" && (
+          <div className="ml-1 flex items-center gap-1.5">
+            <span className="relative flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-800/60 text-slate-400" title={reviewCount > 0 ? `${reviewCount} item(s) to verify` : "No alerts"}>
+              <Bell className="h-4 w-4" />{reviewCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-slate-900">{reviewCount}</span>}
+            </span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-800/60 text-slate-400" title="Settings"><Settings className="h-4 w-4" /></span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-xs font-bold text-white" title="Account">VB</span>
+          </div>
+        )}
       </div>
     </header>
+  );
+}
+function StatChip({ label, value, tone }) {
+  const c = tone === "red" ? "text-red-400" : tone === "amber" ? "text-amber-400" : tone === "emerald" ? "text-emerald-400" : tone === "muted" ? "text-slate-500" : "text-slate-100";
+  return (
+    <div className="rounded-lg border border-slate-700/80 bg-slate-800/50 px-2.5 py-1.5 text-right leading-none sm:px-3">
+      <div className="text-[9px] font-medium uppercase tracking-wider text-slate-500">{label}</div>
+      <div className={`mt-1 font-mono text-[15px] font-bold ${c}`}>{value}</div>
+    </div>
   );
 }
 function HeaderStat({ label, value, tone }) {
@@ -2029,7 +2157,8 @@ function Selectish({ value, onChange, options }) {
 }
 
 /* ---- floor plan ---------------------------------------------------------- */
-function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect }) {
+function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, scale = PX_PER_IN }) {
+  const PX_PER_IN = scale;
   const W = van.intWidth * PX_PER_IN, L = van.intLength * PX_PER_IN, gridStep = 12 * PX_PER_IN;
   return (
     <div className="relative" style={{ width: W + 56, paddingTop: 28, paddingBottom: 28 }}>
@@ -2274,13 +2403,13 @@ const TABS = [{ id: "Materials", icon: Package }, { id: "Electrical", icon: Zap 
 function BottomPanel({ tab, setTab, items, stats, van, elec, axle, roof, anyOutside, anyTall, elecFlags, axleFlag, reviewCount }) {
   return (
     <div className="flex h-72 shrink-0 flex-col border-t border-slate-800 bg-slate-900">
-      <div className="flex shrink-0 items-center gap-1 border-b border-slate-800 px-2">
+      <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-800 px-2">
         {TABS.map((t) => {
           const Icon = t.icon, active = tab === t.id;
           const flag = (t.id === "Electrical" && elecFlags) || (t.id === "Weight" && (anyTall || axleFlag)) || (t.id === "Materials" && reviewCount > 0) || (t.id === "Checklist" && (reviewCount > 0 || anyOutside || anyTall || elecFlags || axleFlag));
-          return <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition ${active ? "border-blue-500 text-blue-400" : "border-transparent text-slate-400 hover:text-slate-200"}`}><Icon className="h-3.5 w-3.5" /> {t.id}{flag && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}</button>;
+          return <button key={t.id} onClick={() => setTab(t.id)} className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-xs font-medium transition ${active ? "border-blue-500 text-blue-400" : "border-transparent text-slate-400 hover:text-slate-200"}`}><Icon className="h-3.5 w-3.5" /> {t.id}{flag && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}</button>;
         })}
-        {anyOutside && <span className="ml-auto flex items-center gap-1 rounded bg-red-500/15 px-2 py-1 text-[11px] text-red-400"><AlertTriangle className="h-3 w-3" /> Items outside boundary</span>}
+        {anyOutside && <span className="ml-auto flex shrink-0 items-center gap-1 rounded bg-red-500/15 px-2 py-1 text-[11px] text-red-400"><AlertTriangle className="h-3 w-3" /> Items outside boundary</span>}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {tab === "Materials" && <MaterialsTab items={items} stats={stats} />}
