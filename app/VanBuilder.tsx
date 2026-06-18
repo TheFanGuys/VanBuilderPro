@@ -656,24 +656,24 @@ function PhoneFrame({ mview, parts, layoutCanvas, build, review, sheet, nav }) {
 }
 
 function TabletFrame({ catalog, canvas, rightRail, detailsOpen, setDetailsOpen, hasSelection }) {
+  // Inline three-zone layout (no overlay / no scrim) so the floorplan stays
+  // visible beside the inspector and re-fits into the space it's given. When the
+  // inspector is open the catalog folds to a slim tab to keep the canvas roomy.
+  const EdgeTab = ({ side, icon: Icon, label, onClick }) => (
+    <button onClick={onClick} title={label} className={`flex w-11 shrink-0 flex-col items-center gap-1 bg-slate-900 pt-3 text-slate-400 active:bg-slate-800 ${side === "left" ? "border-r" : "border-l"} border-slate-800`}>
+      <Icon className="h-5 w-5" />
+      <span className="mt-1 rotate-180 text-[10px] font-semibold uppercase tracking-widest text-slate-500" style={{ writingMode: "vertical-rl" }}>{label}</span>
+    </button>
+  );
   return (
-    <div className="relative flex min-h-0 flex-1">
-      {catalog("flex w-72 shrink-0")}
+    <div className="flex min-h-0 flex-1">
+      {detailsOpen
+        ? <EdgeTab side="left" icon={Package} label="Parts" onClick={() => setDetailsOpen(false)} />
+        : catalog("flex w-72 shrink-0")}
       {canvas("flex min-w-0 flex-1")}
-      <button
-        onClick={() => setDetailsOpen((o) => !o)}
-        className="absolute right-0 top-16 z-10 flex items-center gap-1 rounded-l-md border border-r-0 border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] font-medium text-slate-300 shadow-lg active:bg-slate-800"
-      >
-        <Wrench className="h-3.5 w-3.5" /> {detailsOpen ? "Close" : (hasSelection ? "Details" : "Build")}
-      </button>
-      {detailsOpen && (
-        <>
-          <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setDetailsOpen(false)} />
-          <div className="absolute right-0 top-0 z-30 h-full w-80 max-w-[85%] shadow-2xl">
-            {rightRail("flex h-full w-full")}
-          </div>
-        </>
-      )}
+      {detailsOpen
+        ? rightRail("flex w-80 max-w-[62%] shrink-0")
+        : <EdgeTab side="right" icon={Wrench} label={hasSelection ? "Details" : "Build"} onClick={() => setDetailsOpen(true)} />}
     </div>
   );
 }
@@ -818,7 +818,7 @@ export default function App() {
     recomputeFit();
   }, [recomputeFit]);
   const setMobileViewport = useCallback((node) => { mScrollRef.current = node; setCanvasViewport(node); }, [setCanvasViewport]);
-  useEffect(() => { recomputeFit(); }, [recomputeFit, bp, screen, vanDbOpen, planPanelOpen, tab]);
+  useEffect(() => { recomputeFit(); }, [recomputeFit, bp, screen, vanDbOpen, planPanelOpen, tab, detailsOpen]);
 
   const items = useMemo(() => placed.map((p) => {
     const c = DB_BY_ID[p.cid]; const f = fp(c);
