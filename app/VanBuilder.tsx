@@ -3,7 +3,8 @@ import {
   Truck, Bed, ChefHat, Droplets, Sofa, Refrigerator, Battery, Zap, Sun,
   Fan, Snowflake, Flame, Archive, Box, Package, Trash2, RotateCw, Copy,
   AlertTriangle, Wrench, Plug, Waves, Scale, ChevronDown, Layers, Gauge,
-  CheckCircle2, ShieldAlert, Info, Cable, Ruler, BadgeCheck, ArrowUp, DoorOpen, Eye, EyeOff, X,
+  CheckCircle2, ShieldAlert, Info, Cable, Ruler, BadgeCheck, ArrowUp, DoorOpen, Eye, EyeOff,
+  MousePointer2, Hand, PenTool, Undo2, Redo2, Search, Plus, ClipboardList, FileText, Settings, Bell,
 } from "lucide-react";
 
 /* ============================================================================
@@ -48,6 +49,7 @@ const SYS_LABEL = {
   plumbing: "Plumbing", tank: "Tanks", cabinetry: "Furniture", roof: "Roof", material: "Materials", exterior: "Exterior",
 };
 const SYS_ORDER = ["cabinetry", "appliance", "electrical", "hvac", "plumbing", "tank", "exterior", "roof", "material"];
+const SYS_ICON = { cabinetry: Sofa, appliance: Refrigerator, electrical: Zap, hvac: Fan, plumbing: Droplets, tank: Box, exterior: DoorOpen, roof: Sun, material: Layers };
 
 const DOT = { blue: "bg-blue-500", sky: "bg-sky-500", amber: "bg-amber-500", cyan: "bg-cyan-500", violet: "bg-violet-500", emerald: "bg-emerald-500" };
 const CAT_ORDER = {
@@ -312,12 +314,341 @@ function roofLoad(items, van) {
 }
 
 /* ========================================================================== */
+/* ==========================================================================
+   RESPONSIVE SHELL LAYER  (Phase 1)
+   A device frame is chosen by real width breakpoints so phone, tablet, and
+   desktop are separate layouts instead of one layout toggled at `md`.
+   The frames only arrange existing panels; they do not change any behaviour,
+   data, or calculations. Each panel is passed in as a render fn of className
+   so the frame controls width / visibility while the panel keeps its content.
+       phone   : < 768   (single panel, switched by the bottom nav)
+       tablet  : 768-1279 (parts + canvas, details slide over)
+       desktop : >= 1280  (parts + canvas + always-on right rail)
+   ========================================================================== */
+const BP_TABLET = 768, BP_DESKTOP = 1280;
+function readBreakpoint() {
+  if (typeof window === "undefined") return "desktop";
+  const w = window.innerWidth, h = window.innerHeight;
+  const short = Math.min(w, h);
+  if (short < 600) return "phone";        // any phone, portrait or landscape
+  if (w >= BP_DESKTOP) return "desktop";  // large landscape screen
+  return "tablet";                        // iPads and narrow windows
+}
+function useBreakpoint() {
+  const [bp, setBp] = useState(readBreakpoint);
+  useEffect(() => {
+    const onResize = () => setBp(readBreakpoint());
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => { window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", onResize); };
+  }, []);
+  return bp;
+}
+
+/* ---- Phase 3: tablet experience -----------------------------------------
+   Canvas toolbar + parts-catalog rail (categories, cards, recently used) +
+   six engineering tabs. Drag/drop and calculations are untouched. */
+function SetupBtn({ icon: Icon, label, onClick }) {
+  return <button onClick={onClick} className="flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-2 text-[11px] font-medium text-slate-200 active:bg-slate-700"><Icon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{label}</span></button>;
+}
+function ToolBtn({ icon: Icon, label, active, onClick }) {
+  return (
+    <button onClick={onClick} title={label} className={`flex h-9 w-9 items-center justify-center rounded-md border transition ${active ? "border-blue-500/60 bg-blue-500/15 text-blue-300" : "border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200"}`}>
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+function CanvasToolbar({ tool, setTool, canvasView, onTool, onComingSoon }) {
+  return (
+    <div className="flex shrink-0 items-center gap-1 border-b border-slate-800 bg-slate-900 px-2 py-1.5">
+      <ToolBtn icon={MousePointer2} label="Select" active={tool === "select"} onClick={() => setTool("select")} />
+      <ToolBtn icon={Hand} label="Pan" active={tool === "pan"} onClick={() => { setTool("pan"); onComingSoon("Pan"); }} />
+      <div className="mx-1 h-5 w-px bg-slate-800" />
+      <ToolBtn icon={PenTool} label="Draw Wall" onClick={() => onComingSoon("Draw Wall")} />
+      <ToolBtn icon={Ruler} label="Measure" onClick={() => onComingSoon("Measure")} />
+      <div className="mx-1 h-5 w-px bg-slate-800" />
+      <ToolBtn icon={Undo2} label="Undo" onClick={() => onComingSoon("Undo")} />
+      <ToolBtn icon={Redo2} label="Redo" onClick={() => onComingSoon("Redo")} />
+      <div className="ml-auto flex items-center rounded-md border border-slate-700 bg-slate-800 p-0.5">
+        <button className={`rounded px-3 py-1 text-xs font-semibold ${canvasView === "2d" ? "bg-blue-600 text-white" : "text-slate-400"}`}>2D</button>
+        <button onClick={() => onComingSoon("3D view")} className="rounded px-3 py-1 text-xs font-semibold text-slate-400 hover:text-slate-200">3D</button>
+      </div>
+    </div>
+  );
+}
+function CatRow({ icon: Icon, label, count, active, onClick }) {
+  return (
+    <button onClick={onClick} className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition ${active ? "bg-blue-500/15 text-blue-300" : "text-slate-300 hover:bg-slate-800"}`}>
+      <Icon className={`h-4 w-4 shrink-0 ${active ? "text-blue-300" : "text-slate-400"}`} /><span className="flex-1 truncate">{label}</span>
+      {count != null && <span className="font-mono text-[10px] text-slate-500">{count}</span>}
+    </button>
+  );
+}
+function CatCard({ c, onAdd, onInfo }) {
+  const Icon = c.icon || Box;
+  return (
+    <div className="group relative flex flex-col rounded-lg border border-slate-800 bg-slate-800/40 p-2.5 transition hover:border-slate-600 hover:bg-slate-800">
+      <button onClick={() => onAdd(c.id)} className="flex flex-1 flex-col items-start gap-1.5 text-left">
+        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-900"><Icon className="h-5 w-5 text-slate-300 group-hover:text-blue-400" /></span>
+        <span className="line-clamp-2 text-xs font-medium leading-tight text-slate-200">{c.name}</span>
+        <span className="flex items-center gap-1 font-mono text-[10px] text-slate-500">{c.weight != null ? c.weight + " lb" : "? lb"}{c.needsReview && <span title="Needs review" className="h-1.5 w-1.5 rounded-full bg-amber-400" />}</span>
+      </button>
+      <button onClick={() => onInfo(c.id)} title="Details" className="absolute right-1.5 top-1.5 rounded p-0.5 text-slate-500 opacity-0 transition group-hover:opacity-100 hover:text-blue-300"><Info className="h-3.5 w-3.5" /></button>
+    </div>
+  );
+}
+
+
+function MobileStat({ label, value, tone }) {
+  const c = tone === "red" ? "text-red-400" : tone === "amber" ? "text-amber-400" : tone === "emerald" ? "text-emerald-400" : tone === "muted" ? "text-slate-500" : "text-slate-100";
+  return <div className="bg-slate-900 px-2 py-2 text-center"><div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div><div className={`font-mono text-sm font-semibold ${c}`}>{value}</div></div>;
+}
+function MobileTopBar({ van, stats, reviewCount, onHome, onOpenVan }) {
+  const over = stats.remaining != null && stats.remaining < 0;
+  const payTone = !van.payloadKnown ? "muted" : over ? "red" : stats.remaining < van.payload * 0.15 ? "amber" : "emerald";
+  return (
+    <header className="shrink-0 border-b border-slate-800 bg-slate-900">
+      <div className="flex items-center gap-2.5 px-4 pb-2 pt-3">
+        <button onClick={onHome} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-600"><Truck className="h-5 w-5 text-white" /></button>
+        <button onClick={onOpenVan} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-white">{van.name}</div>
+            <div className="truncate text-[11px] text-slate-400">{van.roof_label}</div>
+          </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+        </button>
+        {reviewCount > 0 && <span className="flex shrink-0 items-center gap-1 rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300"><AlertTriangle className="h-3 w-3" /> {reviewCount}</span>}
+      </div>
+      <div className="grid grid-cols-3 gap-px border-t border-slate-800 bg-slate-800">
+        <MobileStat label="Payload left" value={van.payloadKnown ? lb(stats.remaining) : "verify"} tone={payTone} />
+        <MobileStat label="Weight" value={lb(stats.total)} />
+        <MobileStat label="Cost" value={usd(stats.cost)} />
+      </div>
+    </header>
+  );
+}
+function MobileVanPicker({ van, onClose, onPickModel, onSetVan }) {
+  const curGroup = `${van.make}|${van.model}`;
+  const configs = MODEL_GROUPS.find((g) => g.key === curGroup)?.ids || [];
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end bg-black/60" onPointerDown={onClose}>
+      <div className="w-full rounded-t-2xl border border-slate-700 bg-slate-900 p-4" onPointerDown={(e) => e.stopPropagation()} style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-700" />
+        <div className="mb-3 text-sm font-semibold text-white">Choose your van</div>
+        <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">Model</div>
+        <div className="mb-3"><Selectish value={curGroup} onChange={onPickModel} options={MODEL_GROUPS.map((g) => ({ value: g.key, label: `${g.make} ${g.model}` }))} /></div>
+        <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">Configuration</div>
+        <div className="mb-4"><Selectish value={van.id} onChange={onSetVan} options={configs.map((id) => ({ value: id, label: trimLabel(VAN_BY_ID[id]) }))} /></div>
+        <button onClick={onClose} className="min-h-[44px] w-full rounded-xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700">Done</button>
+      </div>
+    </div>
+  );
+}
+function MobileViewBar({ label, onFit }) {
+  return (
+    <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
+      <div className="text-[11px] text-slate-400">Current view: <span className="font-semibold text-slate-200">{label}</span></div>
+      <button onClick={onFit} className="flex min-h-[36px] items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800 px-3 text-xs font-medium text-slate-200 active:bg-slate-700"><Ruler className="h-3.5 w-3.5" /> Fit</button>
+    </div>
+  );
+}
+function MobileNav({ mview, onNav }) {
+  const items = [["parts", "Parts", Package], ["layout", "Layout", Layers], ["build", "Build", Gauge], ["review", "Review", CheckCircle2]];
+  return (
+    <nav className="flex shrink-0 border-t border-slate-800 bg-slate-900" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {items.map(([k, label, Icon]) => (
+        <button key={k} onClick={() => onNav(k)} className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] font-medium ${mview === k ? "text-blue-400" : "text-slate-400"}`}>
+          <Icon className="h-5 w-5" /> {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onHide, onDup, onRemove, onResize }) {
+  if (!it) return null;
+  const c = it.c, Icon = c.icon || Box;
+  const heightClass = pos === "full" ? "h-[88%]" : pos === "half" ? "h-[46%]" : "h-auto";
+  const g = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+  const gi = (q) => `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`;
+  const q = [c.brand, c.model || c.name].filter(Boolean).join(" ");
+  const cycle = () => setPos(pos === "collapsed" ? "half" : pos === "half" ? "full" : "collapsed");
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex max-h-full flex-col justify-end">
+      <div className={`pointer-events-auto flex min-h-0 flex-col rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl ${heightClass}`}>
+        <button onClick={cycle} className="flex shrink-0 justify-center pb-1 pt-2"><span className="h-1 w-10 rounded-full bg-slate-600" /></button>
+        <div className="flex shrink-0 items-center gap-2 px-4 pb-2">
+          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${DOT[c.color]} bg-opacity-20`}><Icon className="h-4 w-4 text-slate-100" /></span>
+          <div className="min-w-0 flex-1" onClick={cycle}>
+            <div className="truncate text-sm font-semibold text-white">{c.name}</div>
+            <div className="truncate text-[11px] text-slate-400">{c.category} · {c.brand}</div>
+          </div>
+          {c.needsReview && <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">Needs review</span>}
+          <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-800 text-slate-400 active:bg-slate-700"><span className="text-base leading-none">✕</span></button>
+        </div>
+        {pos !== "collapsed" && (
+          <>
+            <div className="flex shrink-0 gap-1 border-b border-slate-800 px-3">
+              {["Details", "Mounting", "Notes", "Sources"].map((t) => (
+                <button key={t} onClick={() => setTab(t)} className={`min-h-[40px] border-b-2 px-2 text-xs font-medium ${tab === t ? "border-blue-500 text-blue-400" : "border-transparent text-slate-400"}`}>{t}</button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {tab === "Details" && (
+                <>
+                  {it.outside && <Flag tone="red" icon={AlertTriangle} text="Outside van boundary" />}
+                  {!it.outside && it.tooTall && <Flag tone="amber" icon={ArrowUp} text={`Taller than roof (${c.height}" > ${van.roofH}")`} />}
+                  {!it.outside && it.onWell && <Flag tone="orange" icon={AlertTriangle} text="Sits over a wheel well" />}
+                  {c.missing.length > 0 && <Flag tone="amber" icon={AlertTriangle} text={`Missing in DB: ${c.missing.map((m) => FIELD_LABEL[m] || m).join(", ")}`} />}
+                  <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
+                    <Spec k="Width" v={c.width != null ? `${c.width}"` : "—"} danger={c.width == null} />
+                    <Spec k="Length" v={c.length != null ? `${c.length}"` : "—"} danger={c.length == null} />
+                    <Spec k="Height" v={c.height != null ? `${c.height}"` : "—"} danger={c.height == null || it.tooTall} />
+                    <Spec k="Weight" v={lb(c.weight)} danger={c.weight == null} />
+                    <Spec k="Cost" v={usd(c.cost)} danger={c.cost == null} />
+                    {c.capacity?.value != null && <Spec k={c.capacity.kind} v={`${c.capacity.value} ${c.capacity.unit}`} />}
+                  </div>
+                  <div className="mt-4 text-[10px] uppercase tracking-widest text-slate-500">Size — adjust to fit</div>
+                  <div className="mt-1.5"><SizeEditor it={it} onResize={onResize} /></div>
+                </>
+              )}
+              {tab === "Mounting" && (
+                <>
+                  {c.mounting?.notes ? <p className="rounded border border-slate-700 bg-slate-950 p-3 text-[12px] leading-relaxed text-slate-300">{c.mounting.notes}</p> : <p className="text-sm text-slate-500">No mounting notes in the database.</p>}
+                  {c.elec && <ElecSpecCard e={c.elec} warns={elecWarnings(c)} />}
+                  {c.plumb && <PlumbSpecCard p={c.plumb} />}
+                </>
+              )}
+              {tab === "Notes" && (
+                <>
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500">Type</div>
+                  <div className="mb-3 text-sm text-slate-200">{c.category} · {c.brand} {c.model}</div>
+                  {c.mounting?.notes && <p className="mb-3 text-[12px] leading-relaxed text-slate-300">{c.mounting.notes}</p>}
+                  {c.missing.length > 0
+                    ? <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-300">Needs verification: {c.missing.map((m) => FIELD_LABEL[m] || m).join(", ")}. Confirm on the manufacturer page before ordering.</div>
+                    : (c.verified ? <div className="flex items-center gap-1.5 text-[11px] text-emerald-400"><BadgeCheck className="h-3.5 w-3.5" /> Verified spec</div> : <div className="text-[11px] text-amber-400/90">Not human-verified yet</div>)}
+                </>
+              )}
+              {tab === "Sources" && (
+                <div className="space-y-2">
+                  <a href={(c.sources[0] && c.sources[0].url) || g(q)} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white active:bg-blue-700">View product <span>↗</span></a>
+                  {c.sources.map((s, i) => (
+                    <a key={i} href={s.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-200">{s.label || "Product page"} <span>↗</span></a>
+                  ))}
+                  <a href={gi(q)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-200">See photos (image search) <span>↗</span></a>
+                  <a href={g(q)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-200">Web search <span>↗</span></a>
+                </div>
+              )}
+            </div>
+            <div className="grid shrink-0 grid-cols-4 gap-2 border-t border-slate-800 p-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
+              <ActBtn icon={RotateCw} label="Rotate" onClick={() => onRotate(it.iid)} />
+              <ActBtn icon={it.hidden ? Eye : EyeOff} label={it.hidden ? "Show" : "Hide"} onClick={() => onHide(it.iid)} />
+              <ActBtn icon={Copy} label="Duplicate" onClick={() => onDup(it.iid)} />
+              <ActBtn icon={Trash2} label="Delete" danger onClick={() => onRemove(it.iid)} />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+function MobileReview({ items, reviewCount, anyOutside, anyTall, elecFlags, axleFlag, onSelect }) {
+  const seen = new Set(), list = [];
+  for (const it of items) { if (it.c.needsReview && !seen.has(it.c.id)) { seen.add(it.c.id); list.push(it); } }
+  const warnings = [];
+  if (anyOutside) warnings.push({ tone: "red", text: "Some components are outside the van boundary." });
+  if (anyTall) warnings.push({ tone: "amber", text: "Some components are taller than the roof height." });
+  if (elecFlags) warnings.push({ tone: "amber", text: "Electrical system has warnings — see the Build tab." });
+  if (axleFlag) warnings.push({ tone: "red", text: "Axle load is over a limit — check weight distribution." });
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto bg-slate-950">
+      <SectionLabel icon={CheckCircle2} text="Build review" />
+      <div className="px-3 pb-4">
+        {warnings.length === 0 && list.length === 0 ? (
+          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-center text-sm text-emerald-300"><BadgeCheck className="mx-auto mb-1 h-6 w-6" />Nothing flagged right now.</div>
+        ) : (
+          <>
+            {warnings.length > 0 && (
+              <div className="mb-3 space-y-1.5">
+                {warnings.map((w, i) => (
+                  <div key={i} className={`flex items-start gap-1.5 rounded border px-2.5 py-2 text-[12px] ${w.tone === "red" ? "border-red-500/40 bg-red-500/10 text-red-300" : "border-amber-500/40 bg-amber-500/10 text-amber-300"}`}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{w.text}</div>
+                ))}
+              </div>
+            )}
+            {list.length > 0 && (
+              <>
+                <div className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{reviewCount} part{reviewCount === 1 ? "" : "s"} to verify</div>
+                <div className="space-y-1.5">
+                  {list.map((it) => { const Icon = it.c.icon || Box; return (
+                    <button key={it.iid} onClick={() => onSelect(it.iid)} className="flex min-h-[44px] w-full items-center gap-2 rounded-md border border-slate-800 bg-slate-800/40 px-3 py-2.5 text-left active:bg-slate-800">
+                      <Icon className="h-4 w-4 shrink-0 text-slate-400" />
+                      <div className="min-w-0 flex-1"><div className="truncate text-sm text-slate-200">{it.c.name}</div><div className="truncate text-[11px] text-slate-500">{it.c.missing.length > 0 ? "Missing: " + it.c.missing.map((m) => FIELD_LABEL[m] || m).join(", ") : "Not human-verified yet"}</div></div>
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" />
+                    </button>
+                  ); })}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PhoneFrame({ mview, parts, layoutCanvas, build, review, sheet, nav }) {
+  return (
+    <>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {mview === "parts" && parts}
+        {mview === "layout" && layoutCanvas}
+        {mview === "build" && build}
+        {mview === "review" && review}
+        {mview === "layout" && sheet}
+      </div>
+      {nav}
+    </>
+  );
+}
+
+function TabletFrame({ catalog, canvas, rightRail, detailsOpen, setDetailsOpen, hasSelection }) {
+  return (
+    <div className="relative flex min-h-0 flex-1">
+      {catalog("flex w-72 shrink-0")}
+      {canvas("flex min-w-0 flex-1")}
+      <button
+        onClick={() => setDetailsOpen((o) => !o)}
+        className="absolute right-0 top-3 z-10 flex items-center gap-1 rounded-l-md border border-r-0 border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] font-medium text-slate-300 shadow-lg active:bg-slate-800"
+      >
+        <Wrench className="h-3.5 w-3.5" /> {detailsOpen ? "Close" : (hasSelection ? "Details" : "Build")}
+      </button>
+      {detailsOpen && (
+        <>
+          <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setDetailsOpen(false)} />
+          <div className="absolute right-0 top-0 z-30 h-full w-80 max-w-[85%] shadow-2xl">
+            {rightRail("flex h-full w-full")}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DesktopFrame({ catalog, canvas, rightRail }) {
+  return (
+    <div className="flex min-h-0 flex-1">
+      {catalog("flex w-72 shrink-0")}
+      {canvas("flex min-w-0 flex-1")}
+      {rightRail("flex w-80 shrink-0")}
+    </div>
+  );
+}
+
 export default function App() {
   const [vanId, setVanId] = useState(DEFAULT_VAN_ID);
   const [placed, setPlaced] = useState([]);
   const [selectedIid, setSelectedIid] = useState(null);
   const [tab, setTab] = useState("Materials");
-  const [mview, setMview] = useState("plan"); // mobile panel: parts | plan | build
+  const [mview, setMview] = useState("layout"); // mobile view: parts | layout | build | review
   const [vanDbOpen, setVanDbOpen] = useState(true);
   const [planPanelOpen, setPlanPanelOpen] = useState(false);
   const [drag, setDrag] = useState(null);
@@ -339,6 +670,19 @@ export default function App() {
   const [showerOpen, setShowerOpen] = useState(false);
   const [showerConfig, setShowerConfig] = useState({ kind: "wet", pan: "36x36", drain: "gravity", valve: true, head: true });
   const [hasSave, setHasSave] = useState(false);
+  // Phase 1 shell state (foundation for Phases 2-4; does not alter existing behaviour)
+  const bp = useBreakpoint();                              // 'phone' | 'tablet' | 'desktop'
+  const [appMode, setAppMode] = useState("layout");        // active app surface
+  const [canvasView, setCanvasView] = useState("2d");      // canvas view mode (3d reserved)
+  const [sheetPos, setSheetPos] = useState("closed");      // mobile bottom-sheet position
+  const [detailsOpen, setDetailsOpen] = useState(false);   // selected-item panel (tablet slide-over)
+  const [vanPickerOpen, setVanPickerOpen] = useState(false); // mobile van selector sheet
+  const [sheetTab, setSheetTab] = useState("Details");     // mobile bottom-sheet active tab
+  const [recentIds, setRecentIds] = useState([]);          // recently added part ids (tablet/desktop catalog)
+  const [catSearch, setCatSearch] = useState("");          // parts catalog search text
+  const [catFilter, setCatFilter] = useState("all");       // active catalog category (all | system)
+  const [tool, setTool] = useState("select");              // canvas toolbar active tool
+  const [setupRailOpen, setSetupRailOpen] = useState(false); // tablet catalog: vehicle & systems group
   useEffect(() => { try { if (localStorage.getItem("vanbuilder.save")) setHasSave(true); } catch (e) {} }, []);
   useEffect(() => {
     if (screen !== "build" || placed.length === 0) return;
@@ -388,6 +732,7 @@ export default function App() {
   const continueBuild = () => { try { const s = JSON.parse(localStorage.getItem("vanbuilder.save") || "null"); if (s && s.vanId) { setVanId(s.vanId); setPlaced(Array.isArray(s.placed) ? s.placed : []); } } catch (e) {} setSelectedIid(null); setScreen("build"); };
   const van = useMemo(() => vanView(VAN_BY_ID[vanId]), [vanId]);
   const canvasRef = useRef(null);
+  const mScrollRef = useRef(null);
 
   const items = useMemo(() => placed.map((p) => {
     const c = DB_BY_ID[p.cid]; const f = fp(c);
@@ -482,6 +827,7 @@ export default function App() {
   }, [drag, place]);
 
   const addToCenter = (cid) => {
+    setRecentIds((r) => [cid, ...r.filter((x) => x !== cid)].slice(0, 8));
     const c = DB_BY_ID[cid], f = fp(c), n = placed.length;
     if (c.category === "Flare") {
       if (placed.some((p) => DB_BY_ID[p.cid].category === "Flare")) { flashToast("Flares already added — one pair, both sides"); return; }
@@ -510,6 +856,13 @@ export default function App() {
   const duplicate = (iid) => { const p = placed.find((q) => q.iid === iid); if (!p) return; const n = uid(); setPlaced((ps) => [...ps, { ...p, iid: n, x: p.x + 6, y: p.y + 6 }]); setSelectedIid(n); };
   const pickModel = (key) => { const g = MODEL_GROUPS.find((x) => x.key === key); if (g) setVanId(g.ids[0]); };
 
+  // Shell: when a component is selected, surface its details on tablet (slide-over)
+  // and reflect the mobile sheet position. Existing phone/desktop panels are untouched.
+  useEffect(() => {
+    if (selectedIid) { setDetailsOpen(true); setSheetPos("half"); }
+    else { setDetailsOpen(false); setSheetPos("closed"); }
+  }, [selectedIid]);
+
   const selected = items.find((it) => it.iid === selectedIid);
   const anyOutside = items.some((it) => it.outside);
   const anyTall = items.some((it) => it.tooTall);
@@ -532,92 +885,214 @@ export default function App() {
   if (screen === "landing") return <Landing hasSave={hasSave} onContinue={continueBuild} onNew={() => setScreen("select")} />;
   if (screen === "select") return <SelectVan onPick={startNewBuild} onBack={() => setScreen("landing")} />;
 
-  return (
-    <div className="flex h-[100dvh] w-full flex-col bg-slate-950 font-sans text-slate-200 antialiased">
-      <TopBar van={van} stats={stats} axle={axle} reviewCount={reviewCount} onHome={() => setScreen("landing")} />
-      <div className="flex min-h-0 flex-1">
-        {/* LEFT */}
-        <aside className={`${mview === "parts" ? "flex" : "hidden"} w-full md:flex md:w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-900`}>
-          <button onClick={() => setVanDbOpen((o) => !o)} className="flex w-full items-center gap-1.5 px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            <Truck className="h-3.5 w-3.5 shrink-0" /> <span className="shrink-0">Van engineering DB</span>
-            {!vanDbOpen && <span className="ml-1 truncate font-normal normal-case tracking-normal text-slate-600">· {trimLabel(VAN_BY_ID[van.id])}</span>}
-            <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform ${vanDbOpen ? "" : "-rotate-90"}`} />
-          </button>
-          {vanDbOpen && (
-          <div className="space-y-2 px-3 pb-3">
-            <Selectish value={`${van.make}|${van.model}`} onChange={pickModel} options={MODEL_GROUPS.map((g) => ({ value: g.key, label: `${g.make} ${g.model}` }))} />
-            <Selectish value={van.id} onChange={setVanId} options={MODEL_GROUPS.find((g) => g.key === `${van.make}|${van.model}`).ids.map((id) => ({ value: id, label: trimLabel(VAN_BY_ID[id]) }))} />
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <Mini label="Length" value={`${van.intLength}"`} /><Mini label="Width" value={`${van.intWidth}"`} /><Mini label="Roof" value={`${van.roofH}"`} />
-            </div>
-            <VanLimits van={van} axle={axle} />
-          </div>
-          )}
-          <button onClick={() => setSetupOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Layers className="h-3.5 w-3.5" /> Shell &amp; materials</button>
-          <button onClick={openRack} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Package className="h-3.5 w-3.5" /> Roof rack{rackCfgFromPlaced(placed).base ? " ✓" : ""}</button>
-          <button onClick={openElec} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Zap className="h-3.5 w-3.5" /> Electrical sizer{placed.some((p) => p.elec) ? " ✓" : ""}</button>
-          <button onClick={() => setPlumbOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Droplets className="h-3.5 w-3.5" /> Plumbing{placed.some((p) => p.plumb) ? " ✓" : ""}</button>
-          <button onClick={() => setShowerOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Waves className="h-3.5 w-3.5" /> Shower{placed.some((p) => p.shower) ? " ✓" : ""}</button>
-          <SectionLabel icon={Package} text="Parts database" />
-          <p className="px-3 pb-2 text-[11px] text-slate-500">Tap a system to open it, then a category. Tap a part to add - tap again for more.</p>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-            <Catalog grouped={grouped} onTap={addToCenter} onDragStart={startNew} onInfo={setPartInfo} />
-          </div>
-        </aside>
+  const catalogPanel = (cls) => (
+    <aside className={`min-h-0 flex-col border-r border-slate-800 bg-slate-900 ${cls}`}>
+      <button onClick={() => setVanDbOpen((o) => !o)} className="flex w-full items-center gap-1.5 px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <Truck className="h-3.5 w-3.5 shrink-0" /> <span className="shrink-0">Van engineering DB</span>
+        {!vanDbOpen && <span className="ml-1 truncate font-normal normal-case tracking-normal text-slate-600">· {trimLabel(VAN_BY_ID[van.id])}</span>}
+        <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform ${vanDbOpen ? "" : "-rotate-90"}`} />
+      </button>
+      {vanDbOpen && (
+      <div className="space-y-2 px-3 pb-3">
+        <Selectish value={`${van.make}|${van.model}`} onChange={pickModel} options={MODEL_GROUPS.map((g) => ({ value: g.key, label: `${g.make} ${g.model}` }))} />
+        <Selectish value={van.id} onChange={setVanId} options={MODEL_GROUPS.find((g) => g.key === `${van.make}|${van.model}`).ids.map((id) => ({ value: id, label: trimLabel(VAN_BY_ID[id]) }))} />
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <Mini label="Length" value={`${van.intLength}"`} /><Mini label="Width" value={`${van.intWidth}"`} /><Mini label="Roof" value={`${van.roofH}"`} />
+        </div>
+        <VanLimits van={van} axle={axle} />
+      </div>
+      )}
+      <button onClick={() => setSetupOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Layers className="h-3.5 w-3.5" /> Shell &amp; materials</button>
+      <button onClick={openRack} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Package className="h-3.5 w-3.5" /> Roof rack{rackCfgFromPlaced(placed).base ? " ✓" : ""}</button>
+      <button onClick={openElec} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Zap className="h-3.5 w-3.5" /> Electrical sizer{placed.some((p) => p.elec) ? " ✓" : ""}</button>
+      <button onClick={() => setPlumbOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Droplets className="h-3.5 w-3.5" /> Plumbing{placed.some((p) => p.plumb) ? " ✓" : ""}</button>
+      <button onClick={() => setShowerOpen(true)} className="mx-3 mb-1 flex items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><Waves className="h-3.5 w-3.5" /> Shower{placed.some((p) => p.shower) ? " ✓" : ""}</button>
+      <SectionLabel icon={Package} text="Parts database" />
+      <p className="px-3 pb-2 text-[11px] text-slate-500">Tap a system to open it, then a category. Tap a part to add - tap again for more.</p>
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        <Catalog grouped={grouped} onTap={addToCenter} onDragStart={startNew} onInfo={setPartInfo} />
+      </div>
+    </aside>
+  );
 
-        {/* CENTER */}
-        <main className={`${mview === "plan" ? "flex" : "hidden"} w-full md:flex min-w-0 md:flex-1 flex-col bg-slate-950`}>
-          <div className={`flex min-h-0 flex-1 items-start justify-center overscroll-none p-3 md:items-center md:p-6 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
-            <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} onStartMove={startMove} onSelect={(iid) => { setSelectedIid(iid); setPlanPanelOpen(true); }} />
+  const tabletCatalogPanel = (cls) => {
+    const q = catSearch.trim().toLowerCase();
+    const allParts = grouped.flatMap((g) => g.list);
+    const searchHits = q ? allParts.filter((c) => `${c.name} ${c.brand} ${c.category}`.toLowerCase().includes(q)) : [];
+    const activeList = catFilter === "all" ? [] : (grouped.find((g) => g.sys === catFilter)?.list || []);
+    const recentCards = recentIds.map((id) => DB_BY_ID[id]).filter(Boolean);
+    return (
+      <aside className={`min-h-0 flex-col border-r border-slate-800 bg-slate-900 ${cls}`}>
+        <div className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Parts Catalog</div>
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800/60 px-2.5">
+            <Search className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+            <input value={catSearch} onChange={(e) => setCatSearch(e.target.value)} placeholder="Search parts..." className="w-full bg-transparent py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none" />
+            {catSearch && <button onClick={() => setCatSearch("")} className="text-slate-500 hover:text-slate-300">✕</button>}
           </div>
-          {items.some((it) => it.hidden) && <button onClick={showAll} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400 md:hidden"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
-          <button onClick={() => setPlanPanelOpen((o) => !o)} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-slate-400 md:hidden">
-            <ChevronDown className={`h-4 w-4 transition-transform ${planPanelOpen ? "" : "rotate-180"}`} />
-            {planPanelOpen ? "Hide parts & details" : (selected ? `Edit ${selected.c.name} · parts & BOM` : "Parts, BOM & details")}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+          {q ? (
+            <>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{searchHits.length} result{searchHits.length === 1 ? "" : "s"}</div>
+              <div className="grid grid-cols-2 gap-2">{searchHits.slice(0, 60).map((c) => <CatCard key={c.id} c={c} onAdd={addToCenter} onInfo={setPartInfo} />)}</div>
+              {searchHits.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No parts match your search.</p>}
+            </>
+          ) : (
+            <>
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Categories</div>
+              <div className="space-y-0.5">
+                <CatRow icon={Package} label="All Parts" count={allParts.length} active={catFilter === "all"} onClick={() => setCatFilter("all")} />
+                {grouped.map((g) => <CatRow key={g.sys} icon={SYS_ICON[g.sys] || Box} label={SYS_LABEL[g.sys]} count={g.list.length} active={catFilter === g.sys} onClick={() => setCatFilter(g.sys)} />)}
+              </div>
+              {catFilter === "all" ? (
+                recentCards.length > 0 ? (
+                  <>
+                    <div className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Recently Used</div>
+                    <div className="space-y-1">{recentCards.map((c) => { const Icon = c.icon || Box; return (
+                      <button key={c.id} onClick={() => addToCenter(c.id)} className="flex w-full items-center gap-2 rounded-md border border-slate-800 bg-slate-800/40 px-2.5 py-2 text-left hover:border-slate-600 hover:bg-slate-800">
+                        <Icon className="h-4 w-4 shrink-0 text-slate-400" /><span className="flex-1 truncate text-xs text-slate-200">{c.name}</span>
+                      </button>
+                    ); })}</div>
+                  </>
+                ) : (
+                  <p className="mt-4 rounded-md border border-dashed border-slate-700 px-3 py-4 text-center text-xs text-slate-500">Pick a category to browse parts. Tap a part to drop it on the floorplan.</p>
+                )
+              ) : (
+                <>
+                  <div className="mb-1.5 mt-4 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{SYS_LABEL[catFilter]}</span>
+                    <button onClick={() => setCatFilter("all")} className="text-[11px] text-blue-400">All parts</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">{activeList.map((c) => <CatCard key={c.id} c={c} onAdd={addToCenter} onInfo={setPartInfo} />)}</div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+        <div className="border-t border-slate-800 p-3">
+          <button onClick={() => flashToast("Custom parts are coming soon")} className="flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white active:bg-blue-700"><Plus className="h-4 w-4" /> Add Custom Part</button>
+        </div>
+        <div className="border-t border-slate-800">
+          <button onClick={() => setSetupRailOpen((o) => !o)} className="flex w-full items-center gap-1.5 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <Wrench className="h-3.5 w-3.5" /> Vehicle &amp; systems <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${setupRailOpen ? "" : "-rotate-90"}`} />
           </button>
-          <div className={`${planPanelOpen ? "" : "hidden"} md:block`}>
-          {selected && (
-            <div className="border-t border-slate-800 bg-slate-900 px-3 py-2 md:hidden">
-              <div className="mb-1.5 truncate text-xs font-medium text-slate-200">{selected.c.name}{selected.hidden && <span className="ml-1.5 text-[10px] text-slate-500">(hidden)</span>}</div>
-              <div className="mb-2"><SizeEditor it={selected} onResize={resize} /></div>
-              <div className="grid grid-cols-4 gap-2">
-                <ActBtn icon={RotateCw} label="Rotate" onClick={() => rotate(selected.iid)} />
-                <ActBtn icon={selected.hidden ? Eye : EyeOff} label={selected.hidden ? "Show" : "Hide"} onClick={() => toggleHide(selected.iid)} />
-                <ActBtn icon={Copy} label="Copy" onClick={() => duplicate(selected.iid)} />
-                <ActBtn icon={Trash2} label="Delete" danger onClick={() => remove(selected.iid)} />
+          {setupRailOpen && (
+            <div className="space-y-1.5 px-3 pb-3">
+              <Selectish value={`${van.make}|${van.model}`} onChange={pickModel} options={MODEL_GROUPS.map((g) => ({ value: g.key, label: `${g.make} ${g.model}` }))} />
+              <Selectish value={van.id} onChange={setVanId} options={MODEL_GROUPS.find((g) => g.key === `${van.make}|${van.model}`).ids.map((id) => ({ value: id, label: trimLabel(VAN_BY_ID[id]) }))} />
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <SetupBtn icon={Layers} label="Shell" onClick={() => setSetupOpen(true)} />
+                <SetupBtn icon={Package} label={"Rack" + (rackCfgFromPlaced(placed).base ? " ✓" : "")} onClick={openRack} />
+                <SetupBtn icon={Zap} label={"Electrical" + (placed.some((p) => p.elec) ? " ✓" : "")} onClick={openElec} />
+                <SetupBtn icon={Droplets} label={"Plumbing" + (placed.some((p) => p.plumb) ? " ✓" : "")} onClick={() => setPlumbOpen(true)} />
+                <SetupBtn icon={Waves} label={"Shower" + (placed.some((p) => p.shower) ? " ✓" : "")} onClick={() => setShowerOpen(true)} />
               </div>
             </div>
           )}
-          <BottomPanel tab={tab} setTab={setTab} items={items} stats={stats} van={van} elec={elec} axle={axle} roof={roof} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} reviewCount={reviewCount} />
-          </div>
-        </main>
+        </div>
+      </aside>
+    );
+  };
 
-        {/* RIGHT */}
-        <aside className={`${mview === "build" ? "flex" : "hidden"} w-full md:flex md:w-80 shrink-0 flex-col border-l border-slate-800 bg-slate-900`}>
-          <SectionLabel icon={Wrench} text="Properties" />
-          <div className="px-3 pb-3">
-            {selected ? <Properties it={selected} van={van} onRemove={remove} onRotate={rotate} onDup={duplicate} onHide={toggleHide} onResize={resize} />
-              : <div className="rounded-md border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-500">Select a component to see its database record.</div>}
-          </div>
-          <SectionLabel icon={Layers} text="Components" />
-          <div className="px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={setSelectedIid} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
-          <SectionLabel icon={Gauge} text="Build stats" />
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4"><BuildStats stats={stats} van={van} axle={axle} count={items.length} /></div>
-        </aside>
+  const canvasPanel = (cls) => (
+    <main data-view={canvasView} className={`min-w-0 flex-col bg-slate-950 ${cls}`}>
+      {bp !== "phone" && <CanvasToolbar tool={tool} setTool={setTool} canvasView={canvasView} onComingSoon={(f) => flashToast(f + " is coming soon")} />}
+      <div className={`flex min-h-0 flex-1 items-start justify-center overscroll-none p-3 md:items-center md:p-6 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
+        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} onStartMove={startMove} onSelect={(iid) => { setSelectedIid(iid); setPlanPanelOpen(true); }} />
       </div>
+      {items.some((it) => it.hidden) && <button onClick={showAll} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400 md:hidden"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
+      <button onClick={() => setPlanPanelOpen((o) => !o)} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-slate-400 md:hidden">
+        <ChevronDown className={`h-4 w-4 transition-transform ${planPanelOpen ? "" : "rotate-180"}`} />
+        {planPanelOpen ? "Hide parts & details" : (selected ? `Edit ${selected.c.name} · parts & BOM` : "Parts, BOM & details")}
+      </button>
+      <div className={`${planPanelOpen ? "" : "hidden"} md:block`}>
+      {selected && (
+        <div className="border-t border-slate-800 bg-slate-900 px-3 py-2 md:hidden">
+          <div className="mb-1.5 truncate text-xs font-medium text-slate-200">{selected.c.name}{selected.hidden && <span className="ml-1.5 text-[10px] text-slate-500">(hidden)</span>}</div>
+          <div className="mb-2"><SizeEditor it={selected} onResize={resize} /></div>
+          <div className="grid grid-cols-4 gap-2">
+            <ActBtn icon={RotateCw} label="Rotate" onClick={() => rotate(selected.iid)} />
+            <ActBtn icon={selected.hidden ? Eye : EyeOff} label={selected.hidden ? "Show" : "Hide"} onClick={() => toggleHide(selected.iid)} />
+            <ActBtn icon={Copy} label="Copy" onClick={() => duplicate(selected.iid)} />
+            <ActBtn icon={Trash2} label="Delete" danger onClick={() => remove(selected.iid)} />
+          </div>
+        </div>
+      )}
+      <BottomPanel tab={tab} setTab={setTab} items={items} stats={stats} van={van} elec={elec} axle={axle} roof={roof} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} reviewCount={reviewCount} />
+      </div>
+    </main>
+  );
 
-      <nav className="flex shrink-0 border-t border-slate-800 bg-slate-900 md:hidden">
-        {[["parts", "Van & Parts", Package], ["plan", "Plan", Layers], ["build", "Build", Gauge]].map(([k, label, Icon]) => (
-          <button key={k} onClick={() => setMview(k)} className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${mview === k ? "text-blue-400" : "text-slate-400"}`}>
-            <Icon className="h-5 w-5" /> {label}
-          </button>
-        ))}
-      </nav>
+  const rightRailPanel = (cls) => (
+    <aside className={`min-h-0 flex-col border-l border-slate-800 bg-slate-900 ${cls}`}>
+      <SectionLabel icon={Wrench} text="Properties" />
+      <div className="px-3 pb-3">
+        {selected ? <Properties it={selected} van={van} onRemove={remove} onRotate={rotate} onDup={duplicate} onHide={toggleHide} onResize={resize} />
+          : <div className="rounded-md border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-500">Select a component to see its database record.</div>}
+      </div>
+      <SectionLabel icon={Layers} text="Components" />
+      <div className="px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={setSelectedIid} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
+      <SectionLabel icon={Gauge} text="Build stats" />
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4"><BuildStats stats={stats} van={van} axle={axle} count={items.length} /></div>
+    </aside>
+  );
 
+  const fitCanvas = () => {
+    const el = mScrollRef.current;
+    if (!el) return;
+    el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
+  };
+  const goLayoutSelect = (iid) => { setSelectedIid(iid); setMview("layout"); setAppMode("layout"); };
+
+  const mobileCanvas = (
+    <main data-view={canvasView} className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-slate-950">
+      <MobileViewBar label={mview === "layout" ? "Layout" : mview} onFit={fitCanvas} />
+      <div ref={mScrollRef} className={`flex min-h-0 flex-1 items-start justify-center overscroll-none p-3 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
+        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} onStartMove={startMove} onSelect={setSelectedIid} />
+      </div>
+      {items.some((it) => it.hidden) && <button onClick={showAll} className="flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
+      <div className="pointer-events-none absolute right-3 top-12 z-10 flex flex-col gap-2">
+        {selected && <button onClick={() => rotate(selected.iid)} className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><RotateCw className="h-5 w-5" /></button>}
+        <button onClick={fitCanvas} className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><Ruler className="h-5 w-5" /></button>
+      </div>
+    </main>
+  );
+
+  const mobileBuild = (
+    <div className="min-h-0 flex-1 overflow-y-auto bg-slate-900">
+      <SectionLabel icon={Gauge} text="Build summary" />
+      <div className="px-3 pb-3"><BuildStats stats={stats} van={van} axle={axle} count={items.length} /></div>
+      <SectionLabel icon={Layers} text="Components" />
+      <div className="px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={goLayoutSelect} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
+      <BottomPanel tab={tab} setTab={setTab} items={items} stats={stats} van={van} elec={elec} axle={axle} roof={roof} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} reviewCount={reviewCount} />
+    </div>
+  );
+
+  const mobileReviewView = <MobileReview items={items} reviewCount={reviewCount} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} onSelect={goLayoutSelect} />;
+
+  const mobileSheet = <MobileSheet it={selected} van={van} pos={sheetPos} setPos={setSheetPos} tab={sheetTab} setTab={setSheetTab} onClose={() => setSelectedIid(null)} onRotate={rotate} onHide={toggleHide} onDup={duplicate} onRemove={remove} onResize={resize} />;
+
+  const mobileNav = <MobileNav mview={mview} onNav={(k) => { setMview(k); setAppMode(k); }} />;
+
+  const frame =
+    bp === "phone"  ? <PhoneFrame mview={mview} parts={catalogPanel("flex w-full")} layoutCanvas={mobileCanvas} build={mobileBuild} review={mobileReviewView} sheet={mobileSheet} nav={mobileNav} />
+    : bp === "tablet" ? <TabletFrame catalog={tabletCatalogPanel} canvas={canvasPanel} rightRail={rightRailPanel} detailsOpen={detailsOpen} setDetailsOpen={setDetailsOpen} hasSelection={!!selected} />
+    :                   <DesktopFrame catalog={catalogPanel} canvas={canvasPanel} rightRail={rightRailPanel} />;
+
+  return (
+    <div data-mode={appMode} data-bp={bp} data-sheet={sheetPos} className="flex h-screen [height:100dvh] w-full flex-col overflow-hidden bg-slate-950 font-sans text-slate-200 antialiased" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {bp === "phone"
+        ? <MobileTopBar van={van} stats={stats} reviewCount={reviewCount} onHome={() => setScreen("landing")} onOpenVan={() => setVanPickerOpen(true)} />
+        : <TopBar van={van} stats={stats} axle={axle} reviewCount={reviewCount} onHome={() => setScreen("landing")} />}
+      {frame}
+
+      {vanPickerOpen && bp === "phone" && <MobileVanPicker van={van} onClose={() => setVanPickerOpen(false)} onPickModel={pickModel} onSetVan={setVanId} />}
       {ghost && <div className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-md border border-blue-400 bg-blue-500/30 px-3 py-1.5 text-xs font-medium text-blue-100 shadow-lg" style={{ left: ghost.x, top: ghost.y }}>{ghost.name}</div>}
       {toast && <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-2 text-center text-xs font-semibold text-white shadow-lg md:bottom-6">{toast}</div>}
       {setupOpen && <SetupWizard van={van} choices={setupChoices} onChange={(cat, v) => setSetupChoices((c) => ({ ...c, [cat]: v }))} onApply={applyShell} onClose={() => setSetupOpen(false)} />}
-      {rackOpen && <RackWizard cfg={rackConfig} onChange={(k, v) => setRackConfig((c) => ({ ...c, [k]: v }))} onApply={applyRack} onClose={() => setRackOpen(false)} van={van} onInfo={setPartInfo} />}
+      {rackOpen && <RackWizard cfg={rackConfig} onChange={(k, v) => setRackConfig((c) => ({ ...c, [k]: v }))} onApply={applyRack} onClose={() => setRackOpen(false)} van={van} />}
       {partInfo && <PartDetail c={DB_BY_ID[partInfo]} onClose={() => setPartInfo(null)} />}
       {elecOpen && <ElecWizard cfg={elecConfig} onChange={(k, v) => setElecConfig((c) => ({ ...c, [k]: v }))} onApply={applyElec} onClose={() => setElecOpen(false)} />}
       {plumbOpen && <PlumbWizard cfg={plumbConfig} onChange={(k, v) => setPlumbConfig((c) => ({ ...c, [k]: v }))} onApply={applyPlumb} onClose={() => setPlumbOpen(false)} />}
@@ -632,7 +1107,7 @@ function SetupWizard({ van, choices, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center justify-between gap-2"><span className="text-base font-semibold text-white">Set up your shell</span><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
+        <div className="mb-1 text-base font-semibold text-white">Set up your shell</div>
         <p className="mb-3 text-xs leading-relaxed text-slate-400">Pick insulation and coverings for the {van.name}. Quantities are estimated from the interior — walls ≈ {areas.wall} sq ft, ceiling ≈ {areas.ceiling} sq ft, floor ≈ {areas.floor} sq ft.</p>
         <div className="space-y-3">
           {SHELL_QUESTIONS.map((q) => {
@@ -968,7 +1443,7 @@ function RackDiagram({ cfg, van, onChange }) {
   const overflow = cfg.solarCount > 0 && solarPos.length === 0 && cfg.solarCount > maxFit;
 
   return (
-    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="h-64 w-auto max-w-full rounded-lg bg-slate-950" style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
+    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="h-64 w-auto rounded-lg bg-slate-950" style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
       <text x={W / 2} y={12} textAnchor="middle" fontSize="9" fill="#64748b">front of van · {Math.round(roofLenIn)}×{Math.round(roofWidIn)}" roof · drag to arrange</text>
       <rect x={rx} y={ry} width={rw} height={rh} rx={Math.min(16, rw * 0.12)} fill="#0f172a" stroke="#475569" strokeWidth="2" />
       {cfg.awning && <rect x={rx + rw - 2} y={ry + rh * 0.2} width={9} height={rh * 0.5} rx={3} fill="#f97316" opacity="0.85" />}
@@ -1042,7 +1517,7 @@ function RackDiagram({ cfg, van, onChange }) {
     </svg>
   );
 }
-function RackWizard({ cfg, onChange, onApply, onClose, van, onInfo }) {
+function RackWizard({ cfg, onChange, onApply, onClose, van }) {
   const panel = DB_BY_ID[cfg.solarId];
   const watts = cfg.solarCount * ((panel && panel.capacity && panel.capacity.watts) || (SOLAR_OPTIONS.find((o) => o.value === cfg.solarId) || {}).w || 0);
   const Toggle = ({ k, label }) => (
@@ -1053,26 +1528,16 @@ function RackWizard({ cfg, onChange, onApply, onClose, van, onInfo }) {
     </button>
   );
   const Step = ({ onClick, children }) => <button onPointerDown={(e) => { e.stopPropagation(); onClick(); }} className="flex h-7 w-7 items-center justify-center rounded bg-slate-700 text-base leading-none text-slate-100 active:bg-slate-600">{children}</button>;
-  const InfoBtn = ({ cid }) => (
-    <button disabled={!cid} onPointerDown={(e) => { e.stopPropagation(); if (cid && onInfo) onInfo(cid); }} title="What is this? Photo + product link"
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${cid ? "border-slate-600 bg-slate-800 text-blue-300 active:bg-slate-700" : "border-slate-800 bg-slate-900 text-slate-700"}`}><Info className="h-4 w-4" /></button>
-  );
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-start justify-between gap-2">
-          <div className="text-base font-semibold text-white">Roof rack builder</div>
-          <button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button>
-        </div>
-        <p className="mb-3 text-xs text-slate-400">Pick a rack and what rides on it - it updates live. Tap ⓘ next to any pick to see a photo + product link. Adds to your BOM, not the floorplan.</p>
+        <div className="mb-1 text-base font-semibold text-white">Roof rack builder</div>
+        <p className="mb-3 text-xs text-slate-400">Pick a rack and what rides on it - it updates live. Adds to your BOM, not the floorplan.</p>
         <div className="mb-3 flex justify-center"><RackDiagram cfg={cfg} van={van} onChange={onChange} /></div>
         <div className="space-y-3">
           <div>
             <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Base rack</div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1"><Selectish value={cfg.base} onChange={(v) => onChange("base", v)} options={[{ value: "", label: "— None —" }, ...RACK_BASE_OPTIONS]} /></div>
-              <InfoBtn cid={cfg.base} />
-            </div>
+            <Selectish value={cfg.base} onChange={(v) => onChange("base", v)} options={[{ value: "", label: "— None —" }, ...RACK_BASE_OPTIONS]} />
           </div>
           <div>
             <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Solar panels</div>
@@ -1083,7 +1548,6 @@ function RackWizard({ cfg, onChange, onApply, onClose, van, onInfo }) {
                 <Step onClick={() => onChange("solarCount", Math.min(8, cfg.solarCount + 1))}>+</Step>
               </div>
               <div className="flex-1"><Selectish value={cfg.solarId} onChange={(v) => onChange("solarId", v)} options={SOLAR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} /></div>
-              <InfoBtn cid={cfg.solarId} />
               <button onPointerDown={(e) => { e.stopPropagation(); onChange("solarLandscape", !cfg.solarLandscape); }}
                 className={`flex h-9 shrink-0 items-center gap-1 rounded-md border px-2.5 text-xs font-medium ${cfg.solarLandscape ? "border-blue-400 bg-blue-500/15 text-blue-100" : "border-slate-700 bg-slate-800 text-slate-300"}`}>
                 <RotateCw className="h-3.5 w-3.5" />{cfg.solarLandscape ? "Sideways" : "Lengthwise"}
@@ -1096,17 +1560,14 @@ function RackWizard({ cfg, onChange, onApply, onClose, van, onInfo }) {
           </div>
           <div>
             <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Roof A/C</div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1"><Selectish value={cfg.acId} onChange={(v) => onChange("acId", v)} options={[{ value: "", label: "None" }, ...AC_OPTIONS]} /></div>
-              <InfoBtn cid={cfg.acId} />
-            </div>
+            <Selectish value={cfg.acId} onChange={(v) => onChange("acId", v)} options={[{ value: "", label: "None" }, ...AC_OPTIONS]} />
             {cfg.acId && <div className="mt-1 text-[10px] text-slate-500">Drag the A/C on the diagram. It eats roof space — watch your panels.</div>}
           </div>
           <div className="space-y-2">
             <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Lighting</div>
-            <div className="flex items-center gap-2"><div className="flex-1"><Selectish value={cfg.lightBarId} onChange={(v) => onChange("lightBarId", v)} options={[{ value: "", label: "Front light bar — None" }, ...LIGHTBAR_OPTIONS]} /></div><InfoBtn cid={cfg.lightBarId} /></div>
-            <div className="flex items-center gap-2"><div className="flex-1"><Selectish value={cfg.podsId} onChange={(v) => onChange("podsId", v)} options={[{ value: "", label: "Ditch / scene pods — None" }, ...POD_OPTIONS]} /></div><InfoBtn cid={cfg.podsId} /></div>
-            <div className="flex items-center gap-2"><div className="flex-1"><Selectish value={cfg.rearId} onChange={(v) => onChange("rearId", v)} options={[{ value: "", label: "Rear lights — None" }, ...REAR_OPTIONS]} /></div><InfoBtn cid={cfg.rearId} /></div>
+            <Selectish value={cfg.lightBarId} onChange={(v) => onChange("lightBarId", v)} options={[{ value: "", label: "Front light bar — None" }, ...LIGHTBAR_OPTIONS]} />
+            <Selectish value={cfg.podsId} onChange={(v) => onChange("podsId", v)} options={[{ value: "", label: "Ditch / scene pods — None" }, ...POD_OPTIONS]} />
+            <Selectish value={cfg.rearId} onChange={(v) => onChange("rearId", v)} options={[{ value: "", label: "Rear lights — None" }, ...REAR_OPTIONS]} />
             {[cfg.podsId, cfg.rearId, cfg.lightBarId].some((id) => id && BRACKET_REQ_IDS.has(id)) &&
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-300">These lights need a mounting bracket — add one from Exterior → Lighting Bracket in the catalog.</div>}
           </div>
@@ -1218,7 +1679,7 @@ function ElecWizard({ cfg, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Zap className="h-4 w-4 text-amber-400" /><span className="text-base font-semibold text-white">Electrical system sizer</span></div><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
+        <div className="mb-1 flex items-center gap-2"><Zap className="h-4 w-4 text-amber-400" /><span className="text-base font-semibold text-white">Electrical system sizer</span></div>
         <p className="mb-3 text-xs text-slate-400">Describe the system. It sizes fuses, wire, breakers, and busbars and adds them to your BOM. A starting point - you verify against ABYC E-11 / NEC / RVIA.</p>
         <div className="space-y-3">
           <div>
@@ -1335,7 +1796,7 @@ function PlumbWizard({ cfg, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Droplets className="h-4 w-4 text-sky-400" /><span className="text-base font-semibold text-white">Plumbing system</span></div><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
+        <div className="mb-1 flex items-center gap-2"><Droplets className="h-4 w-4 text-sky-400" /><span className="text-base font-semibold text-white">Plumbing system</span></div>
         <p className="mb-3 text-xs text-slate-400">Pick tanks, pump, and hot water. It builds the plumbing parts list. Drop the plumbing cabinet from the catalog to give it a floorplan spot.</p>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
@@ -1371,7 +1832,7 @@ function ShowerWizard({ cfg, onChange, onApply, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-4" onPointerDown={onClose}>
       <div className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 md:rounded-2xl" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Waves className="h-4 w-4 text-cyan-400" /><span className="text-base font-semibold text-white">Shower</span></div><button onPointerDown={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 active:bg-slate-700"><X className="h-4 w-4" /></button></div>
+        <div className="mb-1 flex items-center gap-2"><Waves className="h-4 w-4 text-cyan-400" /><span className="text-base font-semibold text-white">Shower</span></div>
         <p className="mb-3 text-xs text-slate-400">Choose the shower style and how it drains. It builds the shower parts list. Drop the wet bath / shower from the catalog to place it on the floorplan.</p>
         <div className="space-y-3">
           <div>
@@ -1809,14 +2270,14 @@ function StatRow({ label, value, mono, strong }) { return <div className="flex i
 function Balance({ left, right, l, r }) { const tot = l + r || 1, lp = (l / tot) * 100; return <div><div className="mb-1 flex justify-between font-mono text-[11px] text-slate-300"><span>{left} {lb(l)}</span><span>{right} {lb(r)}</span></div><div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-700"><div className="h-full bg-blue-500" style={{ width: `${lp}%` }} /><div className="h-full bg-sky-400" style={{ width: `${100 - lp}%` }} /></div></div>; }
 
 /* ---- bottom tabs --------------------------------------------------------- */
-const TABS = [{ id: "Materials", icon: Package }, { id: "Electrical", icon: Zap }, { id: "Plumbing", icon: Droplets }, { id: "Weight", icon: Scale }];
+const TABS = [{ id: "Materials", icon: Package }, { id: "Electrical", icon: Zap }, { id: "Plumbing", icon: Droplets }, { id: "Weight", icon: Scale }, { id: "Checklist", icon: ClipboardList }, { id: "Build Sheet", icon: FileText }];
 function BottomPanel({ tab, setTab, items, stats, van, elec, axle, roof, anyOutside, anyTall, elecFlags, axleFlag, reviewCount }) {
   return (
     <div className="flex h-72 shrink-0 flex-col border-t border-slate-800 bg-slate-900">
       <div className="flex shrink-0 items-center gap-1 border-b border-slate-800 px-2">
         {TABS.map((t) => {
           const Icon = t.icon, active = tab === t.id;
-          const flag = (t.id === "Electrical" && elecFlags) || (t.id === "Weight" && (anyTall || axleFlag)) || (t.id === "Materials" && reviewCount > 0);
+          const flag = (t.id === "Electrical" && elecFlags) || (t.id === "Weight" && (anyTall || axleFlag)) || (t.id === "Materials" && reviewCount > 0) || (t.id === "Checklist" && (reviewCount > 0 || anyOutside || anyTall || elecFlags || axleFlag));
           return <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition ${active ? "border-blue-500 text-blue-400" : "border-transparent text-slate-400 hover:text-slate-200"}`}><Icon className="h-3.5 w-3.5" /> {t.id}{flag && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}</button>;
         })}
         {anyOutside && <span className="ml-auto flex items-center gap-1 rounded bg-red-500/15 px-2 py-1 text-[11px] text-red-400"><AlertTriangle className="h-3 w-3" /> Items outside boundary</span>}
@@ -1826,11 +2287,58 @@ function BottomPanel({ tab, setTab, items, stats, van, elec, axle, roof, anyOuts
         {tab === "Electrical" && <ElectricalTab elec={elec} />}
         {tab === "Plumbing" && <PlumbingTab items={items} stats={stats} />}
         {tab === "Weight" && <WeightTab items={items} stats={stats} van={van} axle={axle} roof={roof} />}
+        {tab === "Checklist" && <ChecklistTab items={items} reviewCount={reviewCount} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} axle={axle} van={van} stats={stats} />}
+        {tab === "Build Sheet" && <BuildSheetTab items={items} stats={stats} van={van} />}
       </div>
     </div>
   );
 }
 function Empty({ text }) { return <div className="py-8 text-center text-sm text-slate-500">{text}</div>; }
+
+function CheckLine({ ok, warn, label, detail }) {
+  const c = ok ? "text-emerald-400" : warn ? "text-amber-400" : "text-red-400";
+  const Icon = ok ? BadgeCheck : AlertTriangle;
+  return (
+    <div className="flex items-start gap-2.5 rounded-md border border-slate-800 bg-slate-800/40 px-3 py-2.5">
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${c}`} />
+      <div className="min-w-0 flex-1"><div className="text-sm text-slate-200">{label}</div>{detail && <div className="text-[11px] text-slate-500">{detail}</div>}</div>
+      <span className={`shrink-0 text-[11px] font-semibold uppercase ${c}`}>{ok ? "Pass" : warn ? "Check" : "Fail"}</span>
+    </div>
+  );
+}
+function ChecklistTab({ items, reviewCount, anyOutside, anyTall, elecFlags, axleFlag, axle, van, stats }) {
+  if (!items.length) return <Empty text="Add components, then run through the build checklist here." />;
+  const payOk = !van.payloadKnown || stats.remaining >= 0;
+  const checks = [
+    { ok: !anyOutside, warn: false, label: "All components inside the van", detail: anyOutside ? "Some items sit outside the boundary." : "Nothing past the walls." },
+    { ok: !anyTall, warn: true, label: "Everything fits under the roof", detail: anyTall ? "Some items are taller than the roof height." : "All within roof height." },
+    { ok: van.payloadKnown ? payOk : false, warn: !van.payloadKnown, label: "Within payload limit", detail: !van.payloadKnown ? "Payload not on file — verify the door sticker." : (payOk ? `${lb(stats.remaining)} to spare.` : `${lb(-stats.remaining)} over GVWR.`) },
+    { ok: !(axle.ready && (axle.overF || axle.overR || axle.overG)), warn: false, label: "Axle loads within GAWR", detail: axle.ready ? "Front and rear within limits." : "Axle data not available for this van." },
+    { ok: !elecFlags, warn: true, label: "Electrical system OK", detail: elecFlags ? "Open the Electrical tab to resolve warnings." : "No wiring/fuse warnings." },
+    { ok: reviewCount === 0, warn: true, label: "All parts verified", detail: reviewCount > 0 ? `${reviewCount} part(s) need spec verification.` : "Every part has confirmed specs." },
+  ];
+  const pass = checks.filter((c) => c.ok).length;
+  return (
+    <div className="space-y-2">
+      <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">{pass} of {checks.length} checks passing</div>
+      {checks.map((c, i) => <CheckLine key={i} ok={c.ok} warn={!c.ok && c.warn} label={c.label} detail={c.detail} />)}
+    </div>
+  );
+}
+function BuildSheetTab({ items, stats, van }) {
+  if (!items.length) return <Empty text="Add components to generate the build sheet." />;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat label="Components" value={items.length} />
+        <Stat label="Total weight" value={lb(stats.total)} big />
+        <Stat label="Est. cost" value={usd(stats.cost)} big />
+        <Stat label={van.payloadKnown ? "Payload left" : "Payload"} value={van.payloadKnown ? lb(stats.remaining) : "verify"} />
+      </div>
+      <MaterialsTab items={items} stats={stats} />
+    </div>
+  );
+}
 
 function MaterialsTab({ items, stats }) {
   if (!items.length) return <Empty text="Add components to generate the BOM from the database." />;
