@@ -5,6 +5,7 @@ import {
   AlertTriangle, Wrench, Plug, Waves, Scale, ChevronDown, Layers, Gauge,
   CheckCircle2, ShieldAlert, Info, Cable, Ruler, BadgeCheck, ArrowUp, DoorOpen, Eye, EyeOff,
   MousePointer2, Hand, PenTool, Undo2, Redo2, Search, Plus, ClipboardList, FileText, Settings, Bell,
+  Lock, Unlock, ZoomIn, ZoomOut, Maximize,
 } from "lucide-react";
 
 /* ============================================================================
@@ -668,7 +669,7 @@ function MobileNav({ mview, onNav }) {
     </nav>
   );
 }
-function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onHide, onDup, onRemove, onResize }) {
+function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onHide, onDup, onRemove, onResize, onLock }) {
   const [dragH, setDragH] = useState(null);
   const dragRef = useRef(null);
   if (!it) return null;
@@ -721,6 +722,7 @@ function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onH
             <div className="flex shrink-0 items-center gap-1">
               {c.needsReview && <span title="Specs need review" className="mr-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-400" />}
               <button onClick={() => onRotate(it.iid)} title="Rotate" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-slate-300 active:bg-slate-700"><RotateCw className="h-4 w-4" /></button>
+              <button onClick={() => onLock(it.iid)} title={it.locked ? "Unlock" : "Lock"} className={`flex h-9 w-9 items-center justify-center rounded-md active:bg-slate-700 ${it.locked ? "bg-amber-950/50 text-amber-400" : "bg-slate-800 text-slate-300"}`}>{it.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}</button>
               <button onClick={() => onDup(it.iid)} title="Duplicate" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-slate-300 active:bg-slate-700"><Copy className="h-4 w-4" /></button>
               <button onClick={() => onRemove(it.iid)} title="Delete" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-red-400 active:bg-slate-700"><Trash2 className="h-4 w-4" /></button>
               <button onClick={onClose} title="Close" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-slate-400 active:bg-slate-700"><span className="text-base leading-none">✕</span></button>
@@ -783,6 +785,7 @@ function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onH
             </div>
             <div className="grid shrink-0 grid-cols-4 gap-2 border-t border-slate-800 p-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
               <ActBtn icon={RotateCw} label="Rotate" onClick={() => onRotate(it.iid)} />
+              <ActBtn icon={it.locked ? Lock : Unlock} label={it.locked ? "Unlock" : "Lock"} onClick={() => onLock(it.iid)} />
               <ActBtn icon={it.hidden ? Eye : EyeOff} label={it.hidden ? "Show" : "Hide"} onClick={() => onHide(it.iid)} />
               <ActBtn icon={Copy} label="Duplicate" onClick={() => onDup(it.iid)} />
               <ActBtn icon={Trash2} label="Delete" danger onClick={() => onRemove(it.iid)} />
@@ -983,9 +986,17 @@ export default function App() {
   // empty. We measure the live canvas viewport and pick the largest px-per-inch
   // that still fits (reserving room for the plan's labels/headers), so the
   // floorplan dominates the workspace on every device.
-  const fitScaleRef = useRef(PX_PER_IN);
+  const fitScaleRef = useRef(PX_PER_IN);   // EFFECTIVE px/in (fit × zoom) — drag math reads this
+  const baseFitRef = useRef(PX_PER_IN);    // un-zoomed fit-to-viewport scale
   const draggingRef = useRef(false);
   const [fitScale, setFitScale] = useState(PX_PER_IN);
+  const [zoom, setZoom] = useState(1);     // user zoom multiplier on top of fit (1 = fit)
+  const effScale = fitScale * zoom;        // what the floorplan actually renders at
+  const ZMIN = 1, ZMAX = 6;
+  const zoomBy = (f) => setZoom((z) => Math.max(ZMIN, Math.min(ZMAX, Math.round(z * f * 100) / 100)));
+  // Keep the drag-math ref in lockstep with the rendered scale so dragging stays
+  // pixel-accurate at any zoom level.
+  useEffect(() => { fitScaleRef.current = fitScale * zoom; }, [fitScale, zoom]);
   const canvasViewportRef = useRef(null);
   const recomputeFit = useCallback(() => {
     const el = canvasViewportRef.current;
@@ -1005,8 +1016,8 @@ export default function App() {
     if (!isFinite(s) || s <= 0) return;
     s = Math.max(2.4, Math.min(s, 9));               // never tinier than before, never absurd
     s = Math.floor(s * 100) / 100;                   // floor so it never overflows the viewport
-    if (Math.abs(s - fitScaleRef.current) < 0.01) return;
-    fitScaleRef.current = s;
+    if (Math.abs(s - baseFitRef.current) < 0.01) return;
+    baseFitRef.current = s;
     setFitScale(s);
   }, [van.intWidth, van.intLength]);
   const fitRO = useRef(null);
@@ -1074,6 +1085,12 @@ export default function App() {
   }, []);
   const startNew = (cid, e) => { if (e.pointerType === "touch") return; e.preventDefault(); setSelectedIid(null); setDrag({ kind: "new", cid }); setGhost({ x: e.clientX, y: e.clientY, name: DB_BY_ID[cid].name }); };
   const startMove = (iid, e) => {
+    const lockedItem = placed.find((q) => q.iid === iid);
+    if (lockedItem && lockedItem.locked) {
+      // Locked: select it (so you can unlock) but never start a drag.
+      e.preventDefault(); e.stopPropagation(); setSelectedIid(iid); setSheetPos("collapsed");
+      return;
+    }
     e.preventDefault(); e.stopPropagation(); setSelectedIid(iid); setSheetPos("collapsed");
     draggingRef.current = true;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
@@ -1081,28 +1098,42 @@ export default function App() {
     const S = fitScaleRef.current;
     setDrag({ kind: "move", iid, grabX: (e.clientX - r.left) / S - p.x, grabY: (e.clientY - r.top) / S - p.y });
   };
+  const dragRafRef = useRef(0);
+  const dragPtRef = useRef(null);
   useEffect(() => {
     if (!drag) return;
+    // Commit the dragged item's new position. Throttled to one update per animation
+    // frame so a fast finger-drag doesn't re-render the whole floorplan dozens of
+    // times a second (the old "unresponsive / laggy grab" symptom on phone & iPad).
+    const commitMove = () => {
+      dragRafRef.current = 0;
+      const pt = dragPtRef.current;
+      if (!pt || !canvasRef.current) return;
+      const r = canvasRef.current.getBoundingClientRect();
+      const S = fitScaleRef.current;
+      const nx = (pt.x - r.left) / S - drag.grabX, ny = (pt.y - r.top) / S - drag.grabY;
+      setPlaced((ps) => ps.map((p) => {
+        if (p.iid !== drag.iid) return p;
+        const c = DB_BY_ID[p.cid];
+        if (c && c.category === "Window") {
+          const wall = windowWall({ c, x: p.x }, van);
+          const len = c.length || 24; const cl = (v, m) => Math.max(0, Math.min(v, m));
+          if (wall === "left") return { ...p, x: 0, y: cl(ny, van.intLength - len) };
+          if (wall === "right") return { ...p, x: van.intWidth, y: cl(ny, van.intLength - len) };
+          if (wall === "front") return { ...p, y: 0, x: cl(nx, van.intWidth - len) };
+          return { ...p, y: van.intLength - len, x: cl(nx, van.intWidth - len) };
+        }
+        return { ...p, x: nx, y: ny };
+      }));
+    };
     const onMove = (e) => {
-      if (drag.kind === "new") setGhost({ x: e.clientX, y: e.clientY, name: DB_BY_ID[drag.cid].name });
-      else {
-        const r = canvasRef.current.getBoundingClientRect();
-        const S = fitScaleRef.current;
-        const nx = (e.clientX - r.left) / S - drag.grabX, ny = (e.clientY - r.top) / S - drag.grabY;
-        setPlaced((ps) => ps.map((p) => {
-          if (p.iid !== drag.iid) return p;
-          const c = DB_BY_ID[p.cid];
-          if (c && c.category === "Window") {
-            const wall = windowWall({ c, x: p.x }, van);
-            const len = c.length || 24; const cl = (v, m) => Math.max(0, Math.min(v, m));
-            if (wall === "left") return { ...p, x: 0, y: cl(ny, van.intLength - len) };
-            if (wall === "right") return { ...p, x: van.intWidth, y: cl(ny, van.intLength - len) };
-            if (wall === "front") return { ...p, y: 0, x: cl(nx, van.intWidth - len) };
-            return { ...p, y: van.intLength - len, x: cl(nx, van.intWidth - len) };
-          }
-          return { ...p, x: nx, y: ny };
-        }));
-      }
+      if (drag.kind === "new") { setGhost({ x: e.clientX, y: e.clientY, name: DB_BY_ID[drag.cid].name }); return; }
+      dragPtRef.current = { x: e.clientX, y: e.clientY };
+      if (!dragRafRef.current) dragRafRef.current = requestAnimationFrame(commitMove);
+    };
+    const finish = () => {
+      if (dragRafRef.current) { cancelAnimationFrame(dragRafRef.current); dragRafRef.current = 0; }
+      setDrag(null); setGhost(null); draggingRef.current = false; dragPtRef.current = null;
     };
     const onUp = (e) => {
       if (drag.kind === "new" && canvasRef.current) {
@@ -1112,10 +1143,20 @@ export default function App() {
           setPlaced((ps) => [...ps, { iid, cid: drag.cid, x, y }]); setSelectedIid(iid);
         }
       }
-      setDrag(null); setGhost(null); draggingRef.current = false;
+      finish();
     };
-    window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp);
-    return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+    // iOS/iPadOS fires pointercancel the instant it decides the gesture is a scroll.
+    // The old code never listened for it, so the drag froze mid-move and the page
+    // scrolled out from under your finger. Treat it as a clean end of the drag.
+    const onCancel = () => finish();
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
   }, [drag, place]);
 
   // Hard scroll-lock while dragging a part: a non-passive touchmove guard stops
@@ -1145,6 +1186,7 @@ export default function App() {
   const remove = (iid) => { setPlaced((ps) => ps.filter((p) => p.iid !== iid)); if (selectedIid === iid) setSelectedIid(null); };
   const rotate = (iid) => setPlaced((ps) => ps.map((p) => (p.iid !== iid ? p : { ...p, rot: !p.rot })));
   const toggleHide = (iid) => setPlaced((ps) => ps.map((p) => (p.iid !== iid ? p : { ...p, hidden: !p.hidden })));
+  const toggleLock = (iid) => setPlaced((ps) => ps.map((p) => (p.iid !== iid ? p : { ...p, locked: !p.locked })));
   const showAll = () => setPlaced((ps) => ps.map((p) => (p.hidden ? { ...p, hidden: false } : p)));
   const resize = (iid, dim, delta) => setPlaced((ps) => ps.map((p) => {
     if (p.iid !== iid) return p;
@@ -1365,10 +1407,16 @@ export default function App() {
   };
 
   const canvasPanel = (cls) => (
-    <main data-view={canvasView} className={`min-w-0 flex-col bg-slate-950 ${cls}`}>
+    <main data-view={canvasView} className={`relative min-w-0 flex-col bg-slate-950 ${cls}`}>
       {bp !== "phone" && <CanvasToolbar tool={tool} setTool={setTool} canvasView={canvasView} showDims={showDims} onToggleDims={() => setShowDims((v) => !v)} onComingSoon={(f) => flashToast(f + " is coming soon")} />}
-      <div ref={setCanvasViewport} style={{ background: "radial-gradient(circle at 50% 38%, #f2f5f9, #dce2ea)" }} className={`flex min-h-0 flex-1 items-center justify-center overscroll-none p-3 md:p-6 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
-        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={fitScale} showDims={showDims} onStartMove={startMove} onSelect={(iid) => { setSelectedIid(iid); setPlanPanelOpen(true); }} />
+      <div ref={setCanvasViewport} style={{ background: "radial-gradient(circle at 50% 38%, #f2f5f9, #dce2ea)" }} className={`flex min-h-0 flex-1 overscroll-none p-3 md:p-6 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
+        <div className="m-auto"><FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={effScale} showDims={showDims} onStartMove={startMove} onSelect={(iid) => { setSelectedIid(iid); setPlanPanelOpen(true); }} /></div>
+      </div>
+      <div className="pointer-events-none absolute bottom-4 right-4 z-10 flex flex-col gap-1.5">
+        <button onClick={() => zoomBy(1.25)} title="Zoom in" className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg hover:bg-slate-800"><ZoomIn className="h-4 w-4" /></button>
+        <div className="pointer-events-none rounded bg-slate-900/80 px-1 py-0.5 text-center font-mono text-[10px] text-slate-300">{Math.round(zoom * 100)}%</div>
+        <button onClick={() => zoomBy(0.8)} title="Zoom out" className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg hover:bg-slate-800"><ZoomOut className="h-4 w-4" /></button>
+        {zoom > 1.001 && <button onClick={fitCanvas} title="Fit to screen" className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg hover:bg-slate-800"><Maximize className="h-4 w-4" /></button>}
       </div>
       {items.some((it) => it.hidden) && <button onClick={showAll} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400 md:hidden"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
       <button onClick={() => setPlanPanelOpen((o) => !o)} className="flex items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-slate-400 md:hidden">
@@ -1397,17 +1445,18 @@ export default function App() {
     <aside className={`min-h-0 flex-col border-l border-slate-800 bg-slate-900 ${cls}`}>
       <SectionLabel icon={Wrench} text="Properties" />
       <div className="px-3 pb-3">
-        {selected ? <Properties it={selected} van={van} onRemove={remove} onRotate={rotate} onDup={duplicate} onHide={toggleHide} onResize={resize} />
+        {selected ? <Properties it={selected} van={van} onRemove={remove} onRotate={rotate} onDup={duplicate} onHide={toggleHide} onResize={resize} onLock={toggleLock} />
           : <div className="rounded-md border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-500">Select a component to see its database record.</div>}
       </div>
       <SectionLabel icon={Layers} text="Components" />
-      <div className="px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={setSelectedIid} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={setSelectedIid} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
       <SectionLabel icon={Gauge} text="Build stats" />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4"><BuildStats stats={stats} van={van} axle={axle} count={items.length} /></div>
     </aside>
   );
 
   const fitCanvas = () => {
+    setZoom(1);
     recomputeFit();
     const el = mScrollRef.current;
     if (!el) return;
@@ -1419,13 +1468,16 @@ export default function App() {
   const mobileCanvas = (
     <main data-view={canvasView} className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-slate-950">
       <MobileViewBar label={mview === "layout" ? "Layout" : mview} onFit={fitCanvas} />
-      <div ref={setMobileViewport} style={{ background: "radial-gradient(circle at 50% 30%, #f2f5f9, #dce2ea)" }} className={`flex min-h-0 flex-1 items-start justify-center overscroll-none p-3 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
-        <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={fitScale} showDims={showDims} onStartMove={startMove} onSelect={setSelectedIid} />
+      <div ref={setMobileViewport} style={{ background: "radial-gradient(circle at 50% 30%, #f2f5f9, #dce2ea)" }} className={`flex min-h-0 flex-1 overscroll-none p-3 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
+        <div className="mx-auto"><FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={effScale} showDims={showDims} onStartMove={startMove} onSelect={setSelectedIid} /></div>
       </div>
       {items.some((it) => it.hidden) && <button onClick={showAll} className="flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
       <div className="pointer-events-none absolute right-3 top-12 z-10 flex flex-col gap-2">
         {selected && <button onClick={() => rotate(selected.iid)} className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><RotateCw className="h-5 w-5" /></button>}
         <button onClick={() => setShowDims((v) => !v)} title={showDims ? "Hide dimensions" : "Show dimensions"} className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border shadow-lg ${showDims ? "border-blue-500/60 bg-blue-600 text-white" : "border-slate-700 bg-slate-900/90 text-slate-200 active:bg-slate-800"}`}><Ruler className="h-5 w-5" /></button>
+        <button onClick={() => zoomBy(1.25)} title="Zoom in" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><ZoomIn className="h-5 w-5" /></button>
+        <button onClick={() => zoomBy(0.8)} title="Zoom out" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><ZoomOut className="h-5 w-5" /></button>
+        {zoom > 1.001 && <button onClick={fitCanvas} title="Fit to screen" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><Maximize className="h-5 w-5" /></button>}
       </div>
     </main>
   );
@@ -1442,7 +1494,7 @@ export default function App() {
 
   const mobileReviewView = <MobileReview items={items} reviewCount={reviewCount} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} onSelect={goLayoutSelect} />;
 
-  const mobileSheet = <MobileSheet it={selected} van={van} pos={sheetPos} setPos={setSheetPos} tab={sheetTab} setTab={setSheetTab} onClose={() => setSelectedIid(null)} onRotate={rotate} onHide={toggleHide} onDup={duplicate} onRemove={remove} onResize={resize} />;
+  const mobileSheet = <MobileSheet it={selected} van={van} pos={sheetPos} setPos={setSheetPos} tab={sheetTab} setTab={setSheetTab} onClose={() => setSelectedIid(null)} onRotate={rotate} onHide={toggleHide} onDup={duplicate} onRemove={remove} onResize={resize} onLock={toggleLock} />;
 
   const mobileNav = <MobileNav mview={mview} onNav={(k) => { setMview(k); setAppMode(k); }} />;
 
@@ -2573,7 +2625,7 @@ function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, 
             const big = !it.hidden && h > 40 && w > 52;
             return (
               <div key={it.iid} onPointerDown={(e) => onStartMove(it.iid, e)} title={c.name}
-                className={`group touch-none absolute flex cursor-grab flex-col items-center justify-center overflow-hidden rounded text-center shadow-sm transition-shadow active:cursor-grabbing ${
+                className={`group touch-none absolute flex ${it.locked ? "cursor-default" : "cursor-grab active:cursor-grabbing"} flex-col items-center justify-center overflow-hidden rounded text-center shadow-sm transition-shadow ${
                   it.outside ? "border-2 border-red-500 bg-red-500/25" : it.tooTall ? "border-2 border-amber-500 bg-amber-400/30" : it.onWell ? "border-2 border-orange-500 bg-orange-400/30" : "border-2 " + (FILL_LIGHT[c.color] || "border-slate-500 bg-slate-400/30")
                 } ${!c.placeable ? "border-dashed" : ""} ${it.hidden ? "opacity-30" : ""} ${sel ? "z-10 ring-2 ring-blue-600 ring-offset-2 ring-offset-amber-50" : "z-0"}`}
                 style={{ left: it.x * PX_PER_IN, top: it.y * PX_PER_IN, width: it.hidden ? 20 : Math.max(w, 28), height: it.hidden ? 20 : Math.max(h, 28), touchAction: "none" }}>
@@ -2583,6 +2635,7 @@ function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, 
                 {it.outside && <AlertTriangle className="absolute right-0.5 top-0.5 h-3 w-3 text-red-600" />}
                 {!it.outside && it.tooTall && <ArrowUp className="absolute right-0.5 top-0.5 h-3 w-3 text-amber-600" />}
                 {c.needsReview && !it.outside && !it.tooTall && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 ring-1 ring-white" />}
+                {it.locked && <span className="absolute left-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-amber-500/90 ring-1 ring-white"><Lock className="h-2 w-2 text-white" /></span>}
               </div>
             );
           })}
@@ -2648,7 +2701,7 @@ function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, 
 }
 
 /* ---- properties (database record) --------------------------------------- */
-function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize }) {
+function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize, onLock }) {
   const c = it.c, Icon = c.icon, ew = elecWarnings(c);
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
@@ -2682,6 +2735,10 @@ function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize }) {
 
       <div className="mt-3 text-[10px] uppercase tracking-widest text-slate-500">Size — adjust to fit</div>
       <div className="mt-1.5"><SizeEditor it={it} onResize={onResize} /></div>
+      <button onClick={() => onLock(it.iid)} className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${it.locked ? "border-amber-600 bg-amber-950/40 text-amber-300" : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"}`}>
+        {it.locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+        {it.locked ? "Locked — tap to unlock" : "Lock position"}
+      </button>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <ActBtn icon={RotateCw} label="Rotate" onClick={() => onRotate(it.iid)} />
         <ActBtn icon={it.hidden ? Eye : EyeOff} label={it.hidden ? "Show" : "Hide"} onClick={() => onHide(it.iid)} />
