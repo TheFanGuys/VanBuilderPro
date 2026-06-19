@@ -233,6 +233,22 @@ function brandGroups(items) {
   for (const c of items) (b[c.brand || "Other"] ||= []).push(c);
   return Object.keys(b).sort((a, z) => a.localeCompare(z)).map((brand) => ({ brand, models: b[brand] }));
 }
+// Like brandGroups, but real brands sort first and "Generic" placeholders sink to the bottom.
+function brandGroupsGenericLast(items) {
+  const isGen = (s) => /^generic$/i.test(s || "");
+  return brandGroups(items).sort((a, z) => (isGen(a.brand) - isGen(z.brand)) || a.brand.localeCompare(z.brand));
+}
+// True if this part belongs on the selected van. Universal / unspecified parts always show;
+// make-specific parts only show when their vanFit names the van's model (or you've turned the filter off).
+const VEH_KEY = (make) => (make === "Ram" ? "promaster" : make === "Mercedes-Benz" ? "sprinter" : "transit");
+function matchVehicle(c, make, showAll) {
+  if (showAll) return true;
+  if (c.fitType === "universal") return true;
+  const vf = (c.vanFit || "").toLowerCase();
+  if (!vf) return true;                       // no fitment specified = universal accessory
+  if (vf.includes("universal")) return true;
+  return vf.includes(VEH_KEY(make));
+}
 const FILL = {
   blue: "bg-blue-500/20 border-blue-400", sky: "bg-sky-500/20 border-sky-400",
   amber: "bg-amber-500/20 border-amber-400", cyan: "bg-cyan-500/20 border-cyan-400",
@@ -696,8 +712,20 @@ function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onH
             <div className="truncate text-sm font-semibold text-white">{c.name}</div>
             <div className="truncate text-[11px] text-slate-400">{c.category} · {c.brand}</div>
           </div>
-          {c.needsReview && <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">Needs review</span>}
-          <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-800 text-slate-400 active:bg-slate-700"><span className="text-base leading-none">✕</span></button>
+          {expanded ? (
+            <>
+              {c.needsReview && <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">Needs review</span>}
+              <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-800 text-slate-400 active:bg-slate-700"><span className="text-base leading-none">✕</span></button>
+            </>
+          ) : (
+            <div className="flex shrink-0 items-center gap-1">
+              {c.needsReview && <span title="Specs need review" className="mr-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-400" />}
+              <button onClick={() => onRotate(it.iid)} title="Rotate" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-slate-300 active:bg-slate-700"><RotateCw className="h-4 w-4" /></button>
+              <button onClick={() => onDup(it.iid)} title="Duplicate" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-slate-300 active:bg-slate-700"><Copy className="h-4 w-4" /></button>
+              <button onClick={() => onRemove(it.iid)} title="Delete" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-red-400 active:bg-slate-700"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={onClose} title="Close" className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-slate-400 active:bg-slate-700"><span className="text-base leading-none">✕</span></button>
+            </div>
+          )}
         </div>
         {expanded && (
           <>
@@ -895,6 +923,7 @@ export default function App() {
   const [recentIds, setRecentIds] = useState([]);          // recently added part ids (tablet/desktop catalog)
   const [catSearch, setCatSearch] = useState("");          // parts catalog search text
   const [catFilter, setCatFilter] = useState("all");       // active catalog category (all | system)
+  const [showAllVeh, setShowAllVeh] = useState(false);     // false = only this van's + universal parts
   const [tool, setTool] = useState("select");              // canvas toolbar active tool
   const [showDims, setShowDims] = useState(true);          // dimension overlay on/off
   const [setupRailOpen, setSetupRailOpen] = useState(false); // tablet catalog: vehicle & systems group
@@ -955,6 +984,7 @@ export default function App() {
   // that still fits (reserving room for the plan's labels/headers), so the
   // floorplan dominates the workspace on every device.
   const fitScaleRef = useRef(PX_PER_IN);
+  const draggingRef = useRef(false);
   const [fitScale, setFitScale] = useState(PX_PER_IN);
   const canvasViewportRef = useRef(null);
   const recomputeFit = useCallback(() => {
@@ -1044,7 +1074,8 @@ export default function App() {
   }, []);
   const startNew = (cid, e) => { if (e.pointerType === "touch") return; e.preventDefault(); setSelectedIid(null); setDrag({ kind: "new", cid }); setGhost({ x: e.clientX, y: e.clientY, name: DB_BY_ID[cid].name }); };
   const startMove = (iid, e) => {
-    e.preventDefault(); e.stopPropagation(); setSelectedIid(iid);
+    e.preventDefault(); e.stopPropagation(); setSelectedIid(iid); setSheetPos("collapsed");
+    draggingRef.current = true;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
     const p = placed.find((q) => q.iid === iid); const r = canvasRef.current.getBoundingClientRect();
     const S = fitScaleRef.current;
@@ -1081,11 +1112,20 @@ export default function App() {
           setPlaced((ps) => [...ps, { iid, cid: drag.cid, x, y }]); setSelectedIid(iid);
         }
       }
-      setDrag(null); setGhost(null);
+      setDrag(null); setGhost(null); draggingRef.current = false;
     };
     window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp);
     return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
   }, [drag, place]);
+
+  // Hard scroll-lock while dragging a part: a non-passive touchmove guard stops
+  // the page/canvas from scrolling out from under the finger. Uses a ref so it
+  // engages on the very first move, before React re-renders.
+  useEffect(() => {
+    const block = (e) => { if (draggingRef.current) { try { e.preventDefault(); } catch (er) {} } };
+    window.addEventListener("touchmove", block, { passive: false });
+    return () => window.removeEventListener("touchmove", block, { passive: false });
+  }, []);
 
   const addToCenter = (cid) => {
     setRecentIds((r) => [cid, ...r.filter((x) => x !== cid)].slice(0, 8));
@@ -1120,7 +1160,7 @@ export default function App() {
   // Shell: when a component is selected, surface its details on tablet (slide-over)
   // and reflect the mobile sheet position. Existing phone/desktop panels are untouched.
   useEffect(() => {
-    if (selectedIid) { setDetailsOpen(true); setSheetPos("half"); }
+    if (selectedIid) { setDetailsOpen(true); setSheetPos("collapsed"); }
     else { setDetailsOpen(false); setSheetPos("closed"); }
   }, [selectedIid]);
 
@@ -1194,18 +1234,63 @@ export default function App() {
                   <button onClick={() => setCatFilter("all")} className="text-[11px] text-blue-400">All parts</button>
                 </div>
                 {(() => {
-                  const byCat = {};
-                  activeList.forEach((c) => { const k = subGroupOf(c); (byCat[k] = byCat[k] || []).push(c); });
-                  const keys = Object.keys(byCat).sort((a, b) => byCat[b].length - byCat[a].length || a.localeCompare(b));
-                  return keys.map((k) => (
-                    <div key={k} className="mb-3">
-                      <div className="mb-1.5 flex items-baseline justify-between border-b border-slate-800 pb-1">
-                        <span className="text-[11px] font-medium text-slate-300">{k}</span>
-                        <span className="text-[10px] text-slate-600">{byCat[k].length}</span>
-                      </div>
-                      <div className={`grid ${cols} gap-2`}>{byCat[k].map(card)}</div>
-                    </div>
-                  ));
+                  const vlabel = brandShell(van.make).label;
+                  const vlist = activeList.filter((c) => matchVehicle(c, van.make, showAllVeh));
+                  const hidden = activeList.length - vlist.length;
+                  const Box2 = Box;
+                  return (
+                    <>
+                      {(hidden > 0 || showAllVeh) && (
+                        <button onClick={() => setShowAllVeh((v) => !v)}
+                          className={`mb-2 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-[11px] ${showAllVeh ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : "border-slate-700 bg-slate-800/60 text-slate-300"}`}>
+                          <span>{showAllVeh ? `Showing all vehicles` : `${vlabel} + universal only`}{hidden > 0 && !showAllVeh ? ` · ${hidden} hidden` : ""}</span>
+                          <span className="font-semibold text-blue-300">{showAllVeh ? `Filter to ${vlabel}` : "Show all"}</span>
+                        </button>
+                      )}
+                      {catGroups(catFilter, vlist).map(({ cat, items }) => {
+                        const CatIcon = ICON_BY_CAT[cat] || Box2;
+                        const subs = {};
+                        items.forEach((c) => { const k = subGroupOf(c); (subs[k] = subs[k] || []).push(c); });
+                        const subKeys = Object.keys(subs).sort((a, b) =>
+                          (a === cat ? 1 : 0) - (b === cat ? 1 : 0) || subs[b].length - subs[a].length || a.localeCompare(b));
+                        const divided = subKeys.length > 1 || (subKeys.length === 1 && subKeys[0] !== cat);
+                        return (
+                          <div key={cat} className="mb-4">
+                            <div className="mb-1.5 flex items-baseline gap-1.5 border-b border-slate-700 pb-1">
+                              <CatIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <span className="text-[12px] font-semibold text-slate-200">{cat}</span>
+                              <span className="ml-auto text-[10px] text-slate-600">{items.length}</span>
+                            </div>
+                            {subKeys.map((sk) => {
+                              const list = subs[sk];
+                              const brands = brandGroupsGenericLast(list);
+                              const byBrand = brands.length > 1 && list.length > 6;
+                              return (
+                                <div key={sk} className="mb-2">
+                                  {divided && sk !== cat && (
+                                    <div className="mb-1 mt-1 flex items-baseline justify-between">
+                                      <span className="text-[11px] font-medium text-slate-400">{sk}</span>
+                                      <span className="text-[10px] text-slate-600">{list.length}</span>
+                                    </div>
+                                  )}
+                                  {byBrand ? (
+                                    brands.map(({ brand, models }) => (
+                                      <div key={brand} className="mb-1.5">
+                                        <div className="mb-1 pl-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{brand} <span className="text-slate-600">· {models.length}</span></div>
+                                        <div className={`grid ${cols} gap-2`}>{models.map(card)}</div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className={`grid ${cols} gap-2`}>{brands.flatMap((g) => g.models).map(card)}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
                 })()}
               </>
             )}
