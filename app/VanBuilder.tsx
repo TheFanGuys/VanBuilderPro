@@ -1125,21 +1125,42 @@ export default function App() {
   const setMobileViewport = useCallback((node) => { mScrollRef.current = node; setCanvasViewport(node); }, [setCanvasViewport]);
   useEffect(() => { recomputeFit(); }, [recomputeFit, bp, screen, vanDbOpen, planPanelOpen, tab, detailsOpen]);
 
-  const items = useMemo(() => placed.map((p) => {
-    const c = DB_BY_ID[p.cid]; const f = fp(c);
-    const bw = p.wIn ?? f.w, bl = p.lIn ?? f.l;
-    const w = p.rot ? bl : bw, l = p.rot ? bw : bl;
-    const isMat = c.system === "material";
-    const hIn = p.hIn ?? c.height ?? f.h;
-    const elevIn = Math.max(0, p.elevIn || 0);
-    const outside = !isMat && (p.x < 0 || p.y < 0 || p.x + w > van.intWidth || p.y + l > van.intLength);
-    const tooTall = !isMat && hIn != null && van.roofH != null && (elevIn + hIn) > van.roofH;
-    const onWell = !isMat && overWell({ ...p, c }, van);
-    const fr = c.system === "cabinetry" ? FRAMING_FACTOR[framing] : null;
-    const weightAdj = c.weight != null ? c.weight * (fr ? fr.w : 1) : null;
-    const costAdj = c.cost != null ? c.cost * (fr ? fr.c : 1) : null;
-    return { ...p, c, w, l, hIn, elevIn, outside, tooTall, onWell, weightAdj, costAdj };
-  }), [placed, van, framing]);
+  const items = useMemo(() => {
+    const isMattress = (c) => c.category === "Mattress" || (c.tags || []).includes("mattress");
+    const base = placed.map((p) => {
+      const c = DB_BY_ID[p.cid]; const f = fp(c);
+      const bw = p.wIn ?? f.w, bl = p.lIn ?? f.l;
+      const w = p.rot ? bl : bw, l = p.rot ? bw : bl;
+      const isMat = c.system === "material";
+      // a mattress is always a thin pad — never a tall block, regardless of any height entered
+      const hIn = isMattress(c) ? Math.min(c.height || 5, 5) : (p.hIn ?? c.height ?? f.h);
+      const elevIn = Math.max(0, p.elevIn || 0);
+      const outside = !isMat && (p.x < 0 || p.y < 0 || p.x + w > van.intWidth || p.y + l > van.intLength);
+      const onWell = !isMat && overWell({ ...p, c }, van);
+      const fr = c.system === "cabinetry" ? FRAMING_FACTOR[framing] : null;
+      const weightAdj = c.weight != null ? c.weight * (fr ? fr.w : 1) : null;
+      const costAdj = c.cost != null ? c.cost * (fr ? fr.c : 1) : null;
+      return { ...p, c, w, l, hIn, elevIn, outside, onWell, weightAdj, costAdj };
+    });
+    return base.map((it) => {
+      // mattress auto-rests on top of the tallest cabinet/platform beneath it
+      if (isMattress(it.c)) {
+        let support = 0;
+        for (const o of base) {
+          if (o.iid === it.iid) continue;
+          const oc = o.c; if (oc.system !== "cabinetry" || isMattress(oc) || oc.overhead) continue;
+          if (Math.min(it.x + it.w, o.x + o.w) - Math.max(it.x, o.x) > 2 && Math.min(it.y + it.l, o.y + o.l) - Math.max(it.y, o.y) > 2) {
+            support = Math.max(support, (o.elevIn || 0) + (o.hIn || 0));
+          }
+        }
+        const elevIn = Math.max(it.elevIn || 0, support);
+        const tooTall = van.roofH != null && (elevIn + it.hIn) > van.roofH;
+        return { ...it, elevIn, restOn: support, tooTall };
+      }
+      const tooTall = it.c.system !== "material" && it.hIn != null && van.roofH != null && (it.elevIn + it.hIn) > van.roofH;
+      return { ...it, tooTall };
+    });
+  }, [placed, van, framing]);
 
   const stats = useMemo(() => {
     let dry = 0, cost = 0, driver = 0, pass = 0, freshGal = 0, grayGal = 0, unknownWt = 0;
@@ -1207,6 +1228,18 @@ export default function App() {
     const xt = [0, van.intWidth, van.intWidth / 2];
     const yt = [0, van.intLength, van.intLength / 2];
     ps.forEach((q) => { if (q.iid === iid || !onPlan(q)) return; const f = fp(DB_BY_ID[q.cid]); const bw = q.wIn ?? f.w, bl = q.lIn ?? f.l; const w = q.rot ? bl : bw, l = q.rot ? bw : bl; xt.push(q.x, q.x + w, q.x + w / 2); yt.push(q.y, q.y + l, q.y + l / 2); });
+    (walls || []).forEach((w) => {
+      const dx = Math.abs(w.x2 - w.x1), dy = Math.abs(w.y2 - w.y1), th = Math.max(1.5, wallThickIn(w)) / 2;
+      if (dx < 1.5 && dy >= 1.5) {
+        const wx = (w.x1 + w.x2) / 2, ya = Math.min(w.y1, w.y2), yb = Math.max(w.y1, w.y2), faces = [wx - th, wx + th];
+        const overlapY = (ny + ml) > ya && ny < yb, nearX = [nx, nx + mw].some((ex) => faces.some((fx) => Math.abs(ex - fx) <= SNAP_IN));
+        if (overlapY && nearX) { xt.push(wx - th, wx + th); yt.push(ya, yb); }
+      } else if (dy < 1.5 && dx >= 1.5) {
+        const wy = (w.y1 + w.y2) / 2, xa = Math.min(w.x1, w.x2), xb = Math.max(w.x1, w.x2), faces = [wy - th, wy + th];
+        const overlapX = (nx + mw) > xa && nx < xb, nearY = [ny, ny + ml].some((ey) => faces.some((fy) => Math.abs(ey - fy) <= SNAP_IN));
+        if (overlapX && nearY) { yt.push(wy - th, wy + th); xt.push(xa, xb); }
+      }
+    });
     const guides = []; let bx = nx, by = ny, bX = null, bY = null;
     [0, mw / 2, mw].forEach((off) => xt.forEach((t) => { const d = Math.abs(nx + off - t); if (d <= SNAP_IN && (bX == null || d < bX.d)) bX = { d, snap: t - off, line: t }; }));
     if (bX) { bx = bX.snap; guides.push({ axis: "x", pos: bX.line }); }
@@ -1255,8 +1288,10 @@ export default function App() {
       if (!dragRafRef.current) dragRafRef.current = requestAnimationFrame(commitMove);
     };
     const finish = () => {
+      const movedIid = drag && drag.kind === "move" ? drag.iid : null;
       if (dragRafRef.current) { cancelAnimationFrame(dragRafRef.current); dragRafRef.current = 0; }
       setDrag(null); setGhost(null); setSnapGuides([]); setLoupePt(null); draggingRef.current = false; dragPtRef.current = null;
+      if (movedIid) orientToWall(movedIid);
     };
     const onUp = (e) => {
       if (drag.kind === "new" && canvasRef.current) {
@@ -1321,6 +1356,32 @@ export default function App() {
   }));
   const setElev = (iid, val) => setPlaced((ps) => ps.map((p) => (p.iid !== iid ? p : { ...p, elevIn: Math.max(0, Math.min(120, Math.round(val) || 0)) })));
   const duplicate = (iid) => { const p = placed.find((q) => q.iid === iid); if (!p) return; const n = uid(); setPlaced((ps) => [...ps, { ...p, iid: n, x: p.x + 6, y: p.y + 6 }]); setSelectedIid(n); };
+  const orientToWall = (iid) => setPlaced((ps) => ps.map((p) => {
+    if (p.iid !== iid) return p;
+    const c = DB_BY_ID[p.cid]; if (!c || c.system === "material" || c.category === "Window") return p;
+    const f = fp(c), bw = p.wIn ?? f.w, bl = p.lIn ?? f.l, ew = p.rot ? bl : bw, el = p.rot ? bw : bl, tol = 1.6;
+    const vEdges = [[0, 0, van.intLength], [van.intWidth, 0, van.intLength]];
+    const hEdges = [[0, 0, van.intWidth], [van.intLength, 0, van.intWidth]];
+    (walls || []).forEach((w) => {
+      const dx = Math.abs(w.x2 - w.x1), dy = Math.abs(w.y2 - w.y1), th = Math.max(1.5, wallThickIn(w)) / 2;
+      if (dx < 1.5 && dy >= 1.5) { const wx = (w.x1 + w.x2) / 2, ya = Math.min(w.y1, w.y2), yb = Math.max(w.y1, w.y2); vEdges.push([wx - th, ya, yb], [wx + th, ya, yb]); }
+      else if (dy < 1.5 && dx >= 1.5) { const wy = (w.y1 + w.y2) / 2, xa = Math.min(w.x1, w.x2), xb = Math.max(w.x1, w.x2); hEdges.push([wy - th, xa, xb], [wy + th, xa, xb]); }
+    });
+    const ov = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0) > 1;
+    let fV = null, fH = null;
+    for (const [fx, ya, yb] of vEdges) { if (!ov(p.y, p.y + el, ya, yb)) continue; if (Math.abs(p.x - fx) <= tol) fV = { face: fx, side: "left" }; else if (Math.abs(p.x + ew - fx) <= tol) fV = { face: fx, side: "right" }; }
+    for (const [fy, xa, xb] of hEdges) { if (!ov(p.x, p.x + ew, xa, xb)) continue; if (Math.abs(p.y - fy) <= tol) fH = { face: fy, side: "top" }; else if (Math.abs(p.y + el - fy) <= tol) fH = { face: fy, side: "bottom" }; }
+    let want = p.rot;
+    if (fV && !fH) want = bw <= bl ? false : true;
+    else if (fH && !fV) want = bl <= bw ? false : true;
+    if (want === p.rot) return p;
+    const newEw = want ? bl : bw, newEl = want ? bw : bl;
+    let nx = fV ? (fV.side === "left" ? fV.face : fV.face - newEw) : p.x;
+    let ny = fH ? (fH.side === "top" ? fH.face : fH.face - newEl) : p.y;
+    nx = Math.max(0, Math.min(nx, Math.max(0, van.intWidth - newEw)));
+    ny = Math.max(0, Math.min(ny, Math.max(0, van.intLength - newEl)));
+    return { ...p, rot: want, x: nx, y: ny };
+  }));
   const wallMode = tool === "wall";
   const onAddWall = useCallback((w) => setWalls((ws) => [...ws, { wid: uid(), h: "full", mat: DEFAULT_WALL_MAT, ...w }]), []);
   const removeWall = (wid) => { setWalls((ws) => ws.filter((w) => w.wid !== wid)); setSelectedWid((s) => (s === wid ? null : s)); };
@@ -1377,9 +1438,9 @@ export default function App() {
   // Shell: when a component is selected, surface its details on tablet (slide-over)
   // and reflect the mobile sheet position. Existing phone/desktop panels are untouched.
   useEffect(() => {
-    if (selectedIid) { setDetailsOpen(true); setSheetPos("collapsed"); }
-    else { setDetailsOpen(false); setSheetPos("closed"); }
-  }, [selectedIid]);
+    if (selectedIid || selectedWid) setDetailsOpen(true); else setDetailsOpen(false);
+    setSheetPos(selectedIid ? "collapsed" : "closed");
+  }, [selectedIid, selectedWid]);
 
   const selected = items.find((it) => it.iid === selectedIid);
   const anyOutside = items.some((it) => it.outside);
@@ -1699,7 +1760,7 @@ export default function App() {
 
   const frame =
     bp === "phone"  ? <PhoneFrame mview={mview} parts={tabletCatalogPanel("flex w-full")} layoutCanvas={mobileCanvas} build={mobileBuild} review={mobileReviewView} sheet={mobileSheet} nav={mobileNav} />
-    : bp === "tablet" ? <TabletFrame catalog={tabletCatalogPanel} canvas={canvasPanel} rightRail={rightRailPanel} detailsOpen={detailsOpen} setDetailsOpen={setDetailsOpen} hasSelection={!!selected} />
+    : bp === "tablet" ? <TabletFrame catalog={tabletCatalogPanel} canvas={canvasPanel} rightRail={rightRailPanel} detailsOpen={detailsOpen} setDetailsOpen={setDetailsOpen} hasSelection={!!selected || !!selectedWall} />
     :                   <DesktopFrame catalog={catalogPanel} canvas={canvasPanel} rightRail={rightRailPanel} />;
 
   return (
