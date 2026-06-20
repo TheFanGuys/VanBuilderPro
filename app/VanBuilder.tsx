@@ -5,7 +5,7 @@ import {
   AlertTriangle, Wrench, Plug, Waves, Scale, ChevronDown, Layers, Gauge,
   CheckCircle2, ShieldAlert, Info, Cable, Ruler, BadgeCheck, ArrowUp, DoorOpen, Eye, EyeOff,
   MousePointer2, Hand, PenTool, Undo2, Redo2, Search, Plus, ClipboardList, FileText, Settings, Bell,
-  Lock, Unlock, ZoomIn, ZoomOut, Maximize,
+  Lock, Unlock, ZoomIn, ZoomOut, Maximize, X, Move,
 } from "lucide-react";
 
 /* ============================================================================
@@ -424,6 +424,47 @@ const usd = (n) => (n == null ? "—" : "$" + Math.round(n).toLocaleString());
 const lb = (n) => (n == null ? "—" : Math.round(n).toLocaleString() + " lb");
 const overlap = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
 const uid = () => Math.random().toString(36).slice(2, 9);
+const WALL_HALF_IN = 36;
+const WALL_MATERIALS = [
+  { id: "ply34", label: '3/4" plywood', thickIn: 0.75, lbSqft: 2.3, usdSqft: 4.5 },
+  { id: "stud2x4-birch18", label: '2x4 frame + 1/8" birch', thickIn: 3.75, lbSqft: 1.9, usdSqft: 5 },
+  { id: "stud2x4-ply14", label: '2x4 frame + 1/4" ply', thickIn: 4, lbSqft: 2.5, usdSqft: 5.5 },
+  { id: "mstud-birch18", label: 'Metal studs + 1/8" birch', thickIn: 3.75, lbSqft: 1.5, usdSqft: 5.5 },
+  { id: "mstud-ply14", label: 'Metal studs + 1/4" ply', thickIn: 3.75, lbSqft: 2, usdSqft: 6 },
+  { id: "ex8020-15", label: '80/20 15-series + panel', thickIn: 1.75, lbSqft: 2.2, usdSqft: 14 },
+  { id: "ex8020-10", label: '80/20 10-series + panel', thickIn: 1.25, lbSqft: 1.6, usdSqft: 11 },
+  { id: "shower", label: 'Waterproof shower panel', thickIn: 0.5, lbSqft: 1.4, usdSqft: 6 },
+];
+const WALL_MAT_BY_ID = Object.fromEntries(WALL_MATERIALS.map((m) => [m.id, m]));
+const DEFAULT_WALL_MAT = "stud2x4-ply14";
+const wallMat = (w) => WALL_MAT_BY_ID[w.mat] || WALL_MAT_BY_ID[DEFAULT_WALL_MAT];
+const wallThickIn = (w) => wallMat(w).thickIn;
+const wallLenIn = (w) => Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+const wallHeightIn = (w, roofH) => (w.h === "full" ? (roofH || 76) : w.h === "half" ? WALL_HALF_IN : (Number(w.h) || WALL_HALF_IN));
+const inToFtIn = (n) => { const r = Math.round(n), ft = Math.floor(r / 12), inch = r % 12; return ft ? `${ft}' ${inch}"` : `${inch}"`; };
+// snap a fresh start point: existing endpoints, then van edges, then 1" grid
+function wallSnapStart(x, y, van, walls) {
+  let bx = null, bd = 4;
+  for (const w of walls) for (const p of [[w.x1, w.y1], [w.x2, w.y2]]) { const d = Math.hypot(x - p[0], y - p[1]); if (d < bd) { bd = d; bx = p; } }
+  if (bx) return { x: bx[0], y: bx[1] };
+  let sx = x, sy = y;
+  if (Math.abs(sx) < 3) sx = 0; else if (Math.abs(sx - van.intWidth) < 3) sx = van.intWidth;
+  if (Math.abs(sy) < 3) sy = 0; else if (Math.abs(sy - van.intLength) < 3) sy = van.intLength;
+  return { x: Math.max(0, Math.min(van.intWidth, Math.round(sx))), y: Math.max(0, Math.min(van.intLength, Math.round(sy))) };
+}
+// snap the moving end: endpoint snap if close, else axis-lock to 0/45/90 then edge + grid
+function wallSnapEnd(sx, sy, x, y, van, walls) {
+  for (const w of walls) for (const p of [[w.x1, w.y1], [w.x2, w.y2]]) { if (Math.hypot(x - p[0], y - p[1]) < 4) return { x: p[0], y: p[1], snap: "point" }; }
+  let dx = x - sx, dy = y - sy; const len = Math.hypot(dx, dy); let locked = false;
+  if (len > 0.5) {
+    const ang = Math.atan2(dy, dx), step = Math.PI / 4, snapAng = Math.round(ang / step) * step;
+    if (Math.abs(Math.atan2(Math.sin(ang - snapAng), Math.cos(ang - snapAng))) < 0.31) { dx = len * Math.cos(snapAng); dy = len * Math.sin(snapAng); locked = true; }
+  }
+  let ex = sx + dx, ey = sy + dy;
+  if (Math.abs(ex) < 3) ex = 0; else if (Math.abs(ex - van.intWidth) < 3) ex = van.intWidth;
+  if (Math.abs(ey) < 3) ey = 0; else if (Math.abs(ey - van.intLength) < 3) ey = van.intLength;
+  return { x: Math.max(0, Math.min(van.intWidth, Math.round(ex))), y: Math.max(0, Math.min(van.intLength, Math.round(ey))), snap: locked ? "axis" : null };
+}
 const isAC = (v) => v === "120V" || v === "240V";
 function titleCase(s) { return (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 const fp = (c) => ({ w: c.width ?? DEF_W, l: c.length ?? DEF_L, h: c.height ?? DEF_H });
@@ -555,17 +596,17 @@ function ToolBtn({ icon: Icon, label, active, onClick }) {
     </button>
   );
 }
-function CanvasToolbar({ tool, setTool, canvasView, onTool, showDims, onToggleDims, onComingSoon, onSetView, onRotate3d }) {
+function CanvasToolbar({ tool, setTool, canvasView, onTool, showDims, onToggleDims, onComingSoon, onSetView, onRotate3d, onUndo, onRedo }) {
   return (
     <div className="flex shrink-0 items-center gap-1 border-b border-slate-800 bg-slate-900 px-2 py-1.5">
       <ToolBtn icon={MousePointer2} label="Select" active={tool === "select"} onClick={() => setTool("select")} />
       <ToolBtn icon={Hand} label="Pan" active={tool === "pan"} onClick={() => { setTool("pan"); onComingSoon("Pan"); }} />
       <div className="mx-1 h-5 w-px bg-slate-800" />
-      <ToolBtn icon={PenTool} label="Draw Wall" onClick={() => onComingSoon("Draw Wall")} />
+      <ToolBtn icon={PenTool} label="Draw Wall" active={tool === "wall"} onClick={() => setTool(tool === "wall" ? "select" : "wall")} />
       <ToolBtn icon={Ruler} label={showDims ? "Hide dimensions" : "Show dimensions"} active={showDims} onClick={onToggleDims} />
       <div className="mx-1 h-5 w-px bg-slate-800" />
-      <ToolBtn icon={Undo2} label="Undo" onClick={() => onComingSoon("Undo")} />
-      <ToolBtn icon={Redo2} label="Redo" onClick={() => onComingSoon("Redo")} />
+      <ToolBtn icon={Undo2} label="Undo wall" onClick={onUndo} />
+      <ToolBtn icon={Redo2} label="Redo wall" onClick={onRedo} />
       <div className="ml-auto flex items-center rounded-md border border-slate-700 bg-slate-800 p-0.5">
         <button onClick={() => onSetView && onSetView("2d")} className={`rounded px-3 py-1 text-xs font-semibold ${canvasView === "2d" ? "bg-blue-600 text-white" : "text-slate-400"}`}>2D</button>
         <button onClick={() => onSetView && onSetView("3d")} className={`rounded px-3 py-1 text-xs font-semibold ${canvasView === "3d" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"}`}>3D</button>
@@ -700,7 +741,7 @@ function MobileNav({ mview, onNav }) {
     </nav>
   );
 }
-function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onHide, onDup, onRemove, onResize, onLock }) {
+function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onHide, onDup, onRemove, onResize, onLock, onElev }) {
   const [dragH, setDragH] = useState(null);
   const dragRef = useRef(null);
   if (!it) return null;
@@ -771,7 +812,7 @@ function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onH
               {tab === "Details" && (
                 <>
                   {it.outside && <Flag tone="red" icon={AlertTriangle} text="Outside van boundary" />}
-                  {!it.outside && it.tooTall && <Flag tone="amber" icon={ArrowUp} text={`Taller than roof (${c.height}" > ${van.roofH}")`} />}
+                  {!it.outside && it.tooTall && <Flag tone="amber" icon={ArrowUp} text={it.elevIn > 0 ? `Raised ${it.elevIn}" + ${Math.round(it.hIn)}" tall = ${Math.round(it.elevIn + it.hIn)}" > roof ${van.roofH}"` : `Taller than roof (${Math.round(it.hIn)}" > ${van.roofH}")`} />}
                   {!it.outside && it.onWell && <Flag tone="orange" icon={AlertTriangle} text="Sits over a wheel well" />}
                   {c.missing.length > 0 && <Flag tone="amber" icon={AlertTriangle} text={`Missing in DB: ${c.missing.map((m) => FIELD_LABEL[m] || m).join(", ")}`} />}
                   <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
@@ -784,6 +825,10 @@ function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onH
                   </div>
                   <div className="mt-4 text-[10px] uppercase tracking-widest text-slate-500">Size — adjust to fit</div>
                   <div className="mt-1.5"><SizeEditor it={it} onResize={onResize} /></div>
+                  {c.system !== "material" && (<>
+                    <div className="mt-4 text-[10px] uppercase tracking-widest text-slate-500">Height off floor — platform / bunk / shelf</div>
+                    <div className="mt-1.5"><ElevEditor it={it} onElev={onElev} /></div>
+                  </>)}
                 </>
               )}
               {tab === "Mounting" && (
@@ -962,14 +1007,16 @@ export default function App() {
   const [catFilter, setCatFilter] = useState("all");       // active catalog category (all | system)
   const [showAllVeh, setShowAllVeh] = useState(false);     // false = only this van's + universal parts
   const [tool, setTool] = useState("select");              // canvas toolbar active tool
+  const [walls, setWalls] = useState([]);                  // built partitions: {wid,x1,y1,x2,y2,h,mat}
+  const [selectedWid, setSelectedWid] = useState(null);
   const [showDims, setShowDims] = useState(true);          // dimension overlay on/off
   const [setupRailOpen, setSetupRailOpen] = useState(false); // tablet catalog: vehicle & systems group
   useEffect(() => { try { if (localStorage.getItem("vanbuilder.save")) setHasSave(true); } catch (e) {} }, []);
   useEffect(() => {
     if (screen !== "build" || placed.length === 0) return;
-    try { localStorage.setItem("vanbuilder.save", JSON.stringify({ vanId, placed })); setHasSave(true); } catch (e) {}
-  }, [vanId, placed, screen]);
-  const startNewBuild = (id) => { setVanId(id); setPlaced([]); setSelectedIid(null); setSetupChoices(SHELL_DEFAULTS); setScreen("build"); setSetupOpen(true); };
+    try { localStorage.setItem("vanbuilder.save", JSON.stringify({ vanId, placed, walls })); setHasSave(true); } catch (e) {}
+  }, [vanId, placed, walls, screen]);
+  const startNewBuild = (id) => { setVanId(id); setPlaced([]); setWalls([]); setSelectedWid(null); setSelectedIid(null); setSetupChoices(SHELL_DEFAULTS); setScreen("build"); setSetupOpen(true); };
   const applyShell = (choices) => { setFraming(choices.Framing || "wood"); setPlaced((ps) => [...ps.filter((p) => !isMaterialCid(p.cid)), ...buildShellPlaced(choices, van)]); setSetupOpen(false); flashToast("Updated shell & materials"); };
   const applyRack = (cfg) => {
     const add = []; const push = (cid, n = 1) => { for (let i = 0; i < n; i++) add.push({ iid: uid(), cid, x: 0, y: 0, rack: true }); };
@@ -1021,7 +1068,7 @@ export default function App() {
     setShowerOpen(false);
     flashToast(place ? "Wet bath placed — pan + matched toilet" : (bom.length ? "Shower parts added" : "Shower cleared"));
   };
-  const continueBuild = () => { try { const s = JSON.parse(localStorage.getItem("vanbuilder.save") || "null"); if (s && s.vanId) { setVanId(s.vanId); setPlaced(Array.isArray(s.placed) ? s.placed : []); } } catch (e) {} setSelectedIid(null); setScreen("build"); };
+  const continueBuild = () => { try { const s = JSON.parse(localStorage.getItem("vanbuilder.save") || "null"); if (s && s.vanId) { setVanId(s.vanId); setPlaced(Array.isArray(s.placed) ? s.placed : []); setWalls(Array.isArray(s.walls) ? s.walls : []); } } catch (e) {} setSelectedIid(null); setScreen("build"); };
   const van = useMemo(() => vanView(VAN_BY_ID[vanId]), [vanId]);
   const canvasRef = useRef(null);
   const mScrollRef = useRef(null);
@@ -1084,13 +1131,14 @@ export default function App() {
     const w = p.rot ? bl : bw, l = p.rot ? bw : bl;
     const isMat = c.system === "material";
     const hIn = p.hIn ?? c.height ?? f.h;
+    const elevIn = Math.max(0, p.elevIn || 0);
     const outside = !isMat && (p.x < 0 || p.y < 0 || p.x + w > van.intWidth || p.y + l > van.intLength);
-    const tooTall = !isMat && hIn != null && van.roofH != null && hIn > van.roofH;
+    const tooTall = !isMat && hIn != null && van.roofH != null && (elevIn + hIn) > van.roofH;
     const onWell = !isMat && overWell({ ...p, c }, van);
     const fr = c.system === "cabinetry" ? FRAMING_FACTOR[framing] : null;
     const weightAdj = c.weight != null ? c.weight * (fr ? fr.w : 1) : null;
     const costAdj = c.cost != null ? c.cost * (fr ? fr.c : 1) : null;
-    return { ...p, c, w, l, hIn, outside, tooTall, onWell, weightAdj, costAdj };
+    return { ...p, c, w, l, hIn, elevIn, outside, tooTall, onWell, weightAdj, costAdj };
   }), [placed, van, framing]);
 
   const stats = useMemo(() => {
@@ -1110,11 +1158,19 @@ export default function App() {
       const lFrac = overlap(x0, x1, 0, halfW) / span;
       driver += wgt * q * lFrac; pass += wgt * q * (1 - lFrac);
     }
+    for (const w of walls) {
+      const m = wallMat(w);
+      const openArea = (w.openings || []).reduce((a, o) => a + (o && o.w > 0 ? (o.w * Math.min(wallHeightIn(w, van.roofH), o.dh || 0)) / 144 : 0), 0);
+      const sqft = Math.max(0, (wallLenIn(w) * wallHeightIn(w, van.roofH)) / 144 - openArea);
+      const wt = sqft * m.lbSqft;
+      dry += wt; cost += sqft * m.usdSqft;
+      if ((w.x1 + w.x2) / 2 <= halfW) driver += wt; else pass += wt;
+    }
     const fluids = freshGal * WATER_LB_PER_GAL;
     const total = dry + fluids;
     const remaining = van.payloadKnown ? van.payload - total : null;
-    return { dry, fluids, total, cost, driver, pass, freshGal, grayGal, remaining, unknownWt };
-  }, [items, van]);
+    return { dry, fluids, total, cost, driver, pass, freshGal, grayGal, remaining, unknownWt, wallCount: walls.length };
+  }, [items, van, walls]);
 
   const elec = useMemo(() => systemElec(items), [items]);
   const axle = useMemo(() => computeAxle(items, van), [items, van]);
@@ -1263,7 +1319,59 @@ export default function App() {
     if (dim === "l") return { ...p, lIn: cl((p.lIn ?? f.l) + delta) };
     return { ...p, hIn: cl((p.hIn ?? DB_BY_ID[p.cid].height ?? f.h) + delta) };
   }));
+  const setElev = (iid, val) => setPlaced((ps) => ps.map((p) => (p.iid !== iid ? p : { ...p, elevIn: Math.max(0, Math.min(120, Math.round(val) || 0)) })));
   const duplicate = (iid) => { const p = placed.find((q) => q.iid === iid); if (!p) return; const n = uid(); setPlaced((ps) => [...ps, { ...p, iid: n, x: p.x + 6, y: p.y + 6 }]); setSelectedIid(n); };
+  const wallMode = tool === "wall";
+  const onAddWall = useCallback((w) => setWalls((ws) => [...ws, { wid: uid(), h: "full", mat: DEFAULT_WALL_MAT, ...w }]), []);
+  const removeWall = (wid) => { setWalls((ws) => ws.filter((w) => w.wid !== wid)); setSelectedWid((s) => (s === wid ? null : s)); };
+  const setWallHeight = (wid, h) => setWalls((ws) => ws.map((w) => (w.wid === wid ? { ...w, h } : w)));
+  const setWallMat = (wid, mat) => setWalls((ws) => ws.map((w) => (w.wid === wid ? { ...w, mat } : w)));
+  const addWallOpening = (wid) => setWalls((ws) => ws.map((w) => {
+    if (w.wid !== wid) return w;
+    const len = wallLenIn(w), wd = Math.min(24, Math.max(6, Math.round(len - 2)));
+    const dh = Math.min(72, Math.round(wallHeightIn(w, van.roofH)));
+    return { ...w, openings: [{ id: uid(), off: Math.max(0, Math.round((len - wd) / 2)), w: wd, dh }] };
+  }));
+  const setWallOpening = (wid, patch) => setWalls((ws) => ws.map((w) => {
+    if (w.wid !== wid || !w.openings || !w.openings[0]) return w;
+    const len = wallLenIn(w), hh = wallHeightIn(w, van.roofH), o = w.openings[0];
+    let n = { ...o, ...patch };
+    n.w = Math.max(6, Math.min(Math.round(len), Math.round(n.w)));
+    n.dh = Math.max(12, Math.min(Math.round(hh), Math.round(n.dh)));
+    n.off = Math.max(0, Math.min(Math.round(len - n.w), Math.round(n.off)));
+    return { ...w, openings: [n] };
+  }));
+  const removeWallOpening = (wid) => setWalls((ws) => ws.map((w) => (w.wid === wid ? { ...w, openings: [] } : w)));
+  const setWallLength = (wid, len) => setWalls((ws) => {
+    const w = ws.find((x) => x.wid === wid); if (!w) return ws;
+    const cur = wallLenIn(w) || 1, ux = (w.x2 - w.x1) / cur, uy = (w.y2 - w.y1) / cur, L = Math.max(3, Math.round(len));
+    const ox = w.x2, oy = w.y2, nx = Math.round(w.x1 + ux * L), ny = Math.round(w.y1 + uy * L);
+    return ws.map((x) => {
+      if (x.wid === wid) return { ...x, x2: nx, y2: ny };
+      let r = x;
+      if (Math.abs(x.x1 - ox) < 0.5 && Math.abs(x.y1 - oy) < 0.5) r = { ...r, x1: nx, y1: ny };
+      if (Math.abs(x.x2 - ox) < 0.5 && Math.abs(x.y2 - oy) < 0.5) r = { ...r, x2: nx, y2: ny };
+      return r;
+    });
+  });
+  const selectWall = (wid) => { setSelectedWid(wid); setSelectedIid(null); };
+  const selectPart = (iid) => { setSelectedIid(iid); setSelectedWid(null); };
+  const selectedWall = walls.find((w) => w.wid === selectedWid) || null;
+  const selectedWallIdx = selectedWall ? walls.findIndex((w) => w.wid === selectedWid) : -1;
+  const moveWallNode = (ox, oy, nx, ny) => setWalls((ws) => ws.map((w) => {
+    let r = w;
+    if (Math.abs(w.x1 - ox) < 0.5 && Math.abs(w.y1 - oy) < 0.5) r = { ...r, x1: nx, y1: ny };
+    if (Math.abs(w.x2 - ox) < 0.5 && Math.abs(w.y2 - oy) < 0.5) r = { ...r, x2: nx, y2: ny };
+    return r;
+  }));
+  const wallHist = useRef(null);
+  if (!wallHist.current) wallHist.current = { stack: [walls], idx: 0, lock: true };
+  useEffect(() => {
+    const h = wallHist.current; if (h.lock) { h.lock = false; return; }
+    h.stack = h.stack.slice(0, h.idx + 1); h.stack.push(walls); if (h.stack.length > 60) h.stack.shift(); h.idx = h.stack.length - 1;
+  }, [walls]);
+  const undoWall = () => { const h = wallHist.current; if (h.idx <= 0) return; h.idx--; h.lock = true; setWalls(h.stack[h.idx]); setSelectedWid(null); };
+  const redoWall = () => { const h = wallHist.current; if (h.idx >= h.stack.length - 1) return; h.idx++; h.lock = true; setWalls(h.stack[h.idx]); setSelectedWid(null); };
   const pickModel = (key) => { const g = MODEL_GROUPS.find((x) => x.key === key); if (g) setVanId(g.ids[0]); };
 
   // Shell: when a component is selected, surface its details on tablet (slide-over)
@@ -1479,9 +1587,9 @@ export default function App() {
 
   const canvasPanel = (cls) => (
     <main data-view={canvasView} className={`relative min-w-0 flex-col bg-slate-950 ${cls}`}>
-      {bp !== "phone" && <CanvasToolbar tool={tool} setTool={setTool} canvasView={canvasView} showDims={showDims} onToggleDims={() => setShowDims((v) => !v)} onComingSoon={(f) => flashToast(f + " is coming soon")} onSetView={setCanvasView} onRotate3d={() => setView3dRot((r) => (r + 1) % 4)} />}
+      {bp !== "phone" && <CanvasToolbar tool={tool} setTool={setTool} canvasView={canvasView} showDims={showDims} onToggleDims={() => setShowDims((v) => !v)} onComingSoon={(f) => flashToast(f + " is coming soon")} onSetView={setCanvasView} onRotate3d={() => setView3dRot((r) => (r + 1) % 4)} onUndo={undoWall} onRedo={redoWall} />}
       <div ref={setCanvasViewport} style={{ background: "radial-gradient(circle at 50% 38%, #f2f5f9, #dce2ea)" }} className={`flex min-h-0 flex-1 overscroll-none p-3 md:p-6 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
-        <div className="m-auto">{canvasView === "3d" ? <Iso3D van={van} items={items} rot={view3dRot} /> : <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={effScale} showDims={showDims} onStartMove={startMove} guides={snapGuides} dragIid={drag && drag.kind === "move" ? drag.iid : null} onSelect={(iid) => { setSelectedIid(iid); setPlanPanelOpen(true); }} />}</div>
+        <div className="m-auto">{canvasView === "3d" ? <Iso3D van={van} items={items} walls={walls} rot={view3dRot} /> : <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={effScale} showDims={showDims} onStartMove={startMove} guides={snapGuides} dragIid={drag && drag.kind === "move" ? drag.iid : null} onSelect={(iid) => { selectPart(iid); setPlanPanelOpen(true); }} walls={walls} wallMode={wallMode} selectedWid={selectedWid} onAddWall={onAddWall} onSelectWall={selectWall} onMoveNode={moveWallNode} />}</div>
       </div>
       <DragLoupe van={van} items={items} dragIid={drag && drag.kind === "move" ? drag.iid : null} guides={snapGuides} pt={loupePt} />
       <div className="pointer-events-none absolute bottom-4 right-4 z-10 flex flex-col gap-1.5">
@@ -1517,11 +1625,14 @@ export default function App() {
     <aside className={`min-h-0 flex-col border-l border-slate-800 bg-slate-900 ${cls}`}>
       <SectionLabel icon={Wrench} text="Properties" />
       <div className="min-h-0 max-h-[55vh] shrink-0 overflow-y-auto px-3 pb-3">
-        {selected ? <Properties it={selected} van={van} onRemove={remove} onRotate={rotate} onDup={duplicate} onHide={toggleHide} onResize={resize} onLock={toggleLock} />
-          : <div className="rounded-md border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-500">Select a component to see its database record.</div>}
+        {selectedWall ? <WallProps w={selectedWall} idx={selectedWallIdx} van={van} onLength={setWallLength} onHeight={setWallHeight} onMat={setWallMat} onRemove={removeWall} onAddOpening={addWallOpening} onSetOpening={setWallOpening} onRemoveOpening={removeWallOpening} onClose={() => setSelectedWid(null)} />
+          : selected ? <Properties it={selected} van={van} onRemove={remove} onRotate={rotate} onDup={duplicate} onHide={toggleHide} onResize={resize} onLock={toggleLock} onElev={setElev} />
+          : <div className="rounded-md border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-500">Select a component or wall to edit it.</div>}
       </div>
       <SectionLabel icon={Layers} text="Components" />
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={setSelectedIid} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={selectPart} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
+      <SectionLabel icon={PenTool} text="Walls & partitions" />
+      <div className="shrink-0 px-3 pb-3"><WallList walls={walls} van={van} wallMode={wallMode} selectedWid={selectedWid} onToggle={() => setTool(wallMode ? "select" : "wall")} onSelect={selectWall} onRemove={removeWall} onHeight={setWallHeight} onMat={setWallMat} onLength={setWallLength} onUndo={undoWall} onRedo={redoWall} /></div>
       <SectionLabel icon={Gauge} text="Build stats" />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4"><BuildStats stats={stats} van={van} axle={axle} count={items.length} /></div>
     </aside>
@@ -1541,7 +1652,7 @@ export default function App() {
     <main data-view={canvasView} className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-slate-950">
       <MobileViewBar label={mview === "layout" ? "Layout" : mview} onFit={fitCanvas} />
       <div ref={setMobileViewport} style={{ background: "radial-gradient(circle at 50% 30%, #f2f5f9, #dce2ea)" }} className={`flex min-h-0 flex-1 overscroll-none p-3 ${drag ? "overflow-hidden" : "overflow-auto"}`}>
-        <div className="mx-auto">{canvasView === "3d" ? <Iso3D van={van} items={items} rot={view3dRot} /> : <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={effScale} showDims={showDims} onStartMove={startMove} guides={snapGuides} dragIid={drag && drag.kind === "move" ? drag.iid : null} onSelect={setSelectedIid} />}</div>
+        <div className="mx-auto">{canvasView === "3d" ? <Iso3D van={van} items={items} walls={walls} rot={view3dRot} /> : <FloorPlan van={van} items={items} selectedIid={selectedIid} canvasRef={canvasRef} scale={effScale} showDims={showDims} onStartMove={startMove} guides={snapGuides} dragIid={drag && drag.kind === "move" ? drag.iid : null} onSelect={selectPart} walls={walls} wallMode={wallMode} selectedWid={selectedWid} onAddWall={onAddWall} onSelectWall={selectWall} onMoveNode={moveWallNode} />}</div>
       </div>
       {items.some((it) => it.hidden) && <button onClick={showAll} className="flex shrink-0 items-center justify-center gap-1.5 border-t border-slate-800 bg-slate-900 py-2 text-[11px] font-medium text-blue-400"><Eye className="h-4 w-4" /> Show {items.filter((it) => it.hidden).length} hidden item(s)</button>}
       <DragLoupe van={van} items={items} dragIid={drag && drag.kind === "move" ? drag.iid : null} guides={snapGuides} pt={loupePt} />
@@ -1552,11 +1663,19 @@ export default function App() {
         </div>
         {canvasView === "3d" && <button onClick={() => setView3dRot((r) => (r + 1) % 4)} title="Rotate view" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><RotateCw className="h-5 w-5" /></button>}
         {canvasView !== "3d" && selected && <button onClick={() => rotate(selected.iid)} className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><RotateCw className="h-5 w-5" /></button>}
+        {canvasView !== "3d" && <button onClick={() => setTool(wallMode ? "select" : "wall")} title="Draw wall" className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border shadow-lg ${wallMode ? "border-blue-500/60 bg-blue-600 text-white" : "border-slate-700 bg-slate-900/90 text-slate-200 active:bg-slate-800"}`}><PenTool className="h-5 w-5" /></button>}
+        {canvasView !== "3d" && wallMode && <button onClick={undoWall} title="Undo wall" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><Undo2 className="h-5 w-5" /></button>}
+        {canvasView !== "3d" && wallMode && <button onClick={redoWall} title="Redo wall" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><Redo2 className="h-5 w-5" /></button>}
         <button onClick={() => setShowDims((v) => !v)} title={showDims ? "Hide dimensions" : "Show dimensions"} className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border shadow-lg ${showDims ? "border-blue-500/60 bg-blue-600 text-white" : "border-slate-700 bg-slate-900/90 text-slate-200 active:bg-slate-800"}`}><Ruler className="h-5 w-5" /></button>
         <button onClick={() => zoomBy(1.25)} title="Zoom in" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><ZoomIn className="h-5 w-5" /></button>
         <button onClick={() => zoomBy(0.8)} title="Zoom out" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><ZoomOut className="h-5 w-5" /></button>
         {zoom > 1.001 && <button onClick={fitCanvas} title="Fit to screen" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/90 text-slate-200 shadow-lg active:bg-slate-800"><Maximize className="h-5 w-5" /></button>}
       </div>
+      {selectedWall && canvasView !== "3d" && (
+        <div className="absolute inset-x-2 bottom-2 z-20 max-h-[58vh] overflow-y-auto rounded-xl bg-slate-900/95 shadow-2xl ring-1 ring-slate-700 backdrop-blur">
+          <WallProps w={selectedWall} idx={selectedWallIdx} van={van} onLength={setWallLength} onHeight={setWallHeight} onMat={setWallMat} onRemove={removeWall} onAddOpening={addWallOpening} onSetOpening={setWallOpening} onRemoveOpening={removeWallOpening} onClose={() => setSelectedWid(null)} />
+        </div>
+      )}
     </main>
   );
 
@@ -1566,13 +1685,15 @@ export default function App() {
       <div className="px-3 pb-3"><BuildStats stats={stats} van={van} axle={axle} count={items.length} /></div>
       <SectionLabel icon={Layers} text="Components" />
       <div className="px-3 pb-3"><ComponentsList items={items} selectedIid={selectedIid} onSelect={goLayoutSelect} onHide={toggleHide} onRemove={remove} onShowAll={showAll} onInfo={setPartInfo} /></div>
+      <SectionLabel icon={PenTool} text="Walls & partitions" />
+      <div className="px-3 pb-3"><WallList walls={walls} van={van} wallMode={wallMode} selectedWid={selectedWid} onToggle={() => setTool(wallMode ? "select" : "wall")} onSelect={selectWall} onRemove={removeWall} onHeight={setWallHeight} onMat={setWallMat} onLength={setWallLength} onUndo={undoWall} onRedo={redoWall} /></div>
       <BottomPanel tab={tab} setTab={setTab} items={items} stats={stats} van={van} elec={elec} axle={axle} roof={roof} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} reviewCount={reviewCount} />
     </div>
   );
 
   const mobileReviewView = <MobileReview items={items} reviewCount={reviewCount} anyOutside={anyOutside} anyTall={anyTall} elecFlags={elecFlags} axleFlag={axleFlag} onSelect={goLayoutSelect} />;
 
-  const mobileSheet = <MobileSheet it={selected} van={van} pos={sheetPos} setPos={setSheetPos} tab={sheetTab} setTab={setSheetTab} onClose={() => setSelectedIid(null)} onRotate={rotate} onHide={toggleHide} onDup={duplicate} onRemove={remove} onResize={resize} onLock={toggleLock} />;
+  const mobileSheet = <MobileSheet it={selected} van={van} pos={sheetPos} setPos={setSheetPos} tab={sheetTab} setTab={setSheetTab} onClose={() => setSelectedIid(null)} onRotate={rotate} onHide={toggleHide} onDup={duplicate} onRemove={remove} onResize={resize} onLock={toggleLock} onElev={setElev} />;
 
   const mobileNav = <MobileNav mview={mview} onNav={(k) => { setMview(k); setAppMode(k); }} />;
 
@@ -1758,6 +1879,126 @@ function Catalog({ grouped, onTap, onDragStart, onInfo }) {
   );
 }
 
+function WallProps({ w, idx, van, onLength, onHeight, onMat, onRemove, onClose, onAddOpening, onSetOpening, onRemoveOpening }) {
+  const len = Math.round(wallLenIn(w)), custom = typeof w.h === "number", m = wallMat(w), ht = Math.round(wallHeightIn(w, van.roofH));
+  const op = (w.openings && w.openings[0]) || null;
+  const mini = "flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-800 text-slate-200 active:bg-slate-700";
+  return (
+    <div className="rounded-lg border border-blue-600/40 bg-slate-800/60 p-3">
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded bg-blue-500/20"><PenTool className="h-4 w-4 text-blue-300" /></span>
+        <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-white">Wall {idx + 1}</div><div className="truncate text-[11px] text-slate-400">{m.label} · {ht}" tall · {inToFtIn(len)}</div></div>
+        <button onClick={onClose} title="Close" className="text-slate-500 hover:text-slate-300"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Length</div>
+      <div className="mt-1 flex items-center gap-1.5">
+        <button onClick={() => onLength(w.wid, len - 1)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-lg text-slate-200 active:bg-slate-700">−</button>
+        <div className="flex flex-1 items-center justify-center gap-1 rounded-md border border-slate-700 bg-slate-900/60 py-1.5">
+          <input type="number" inputMode="numeric" value={len} onChange={(e) => onLength(w.wid, Math.max(3, Math.round(+e.target.value || 0)))} className="w-12 bg-transparent text-center text-sm font-semibold text-slate-100 focus:outline-none" />
+          <span className="text-xs text-slate-500">in</span>
+          <span className="text-[11px] text-slate-500">· {inToFtIn(len)}</span>
+        </div>
+        <button onClick={() => onLength(w.wid, len + 1)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-lg text-slate-200 active:bg-slate-700">+</button>
+      </div>
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Height</div>
+      <div className="mt-1 flex items-center gap-1">
+        {[["full", `Full (${van.roofH || 76}")`], ["half", 'Half (36")']].map(([v, lab]) => (
+          <button key={v} onClick={() => onHeight(w.wid, v)} className={`flex-1 rounded-md border px-1.5 py-1.5 text-[11px] transition ${w.h === v ? "border-blue-500 bg-blue-500/15 text-blue-200" : "border-slate-700 bg-slate-800 text-slate-300 active:bg-slate-700"}`}>{lab}</button>
+        ))}
+        <div className={`flex w-20 items-center gap-1 rounded-md border px-1.5 ${custom ? "border-blue-500 bg-blue-500/15" : "border-slate-700 bg-slate-800"}`}>
+          <input type="number" inputMode="numeric" value={custom ? w.h : ""} placeholder="custom" onChange={(e) => { const v = e.target.value; onHeight(w.wid, v === "" ? "half" : Math.max(4, Math.min(van.roofH || 96, Math.round(+v) || 0))); }} className="w-full bg-transparent py-1.5 text-[11px] text-slate-200 placeholder:text-slate-500 focus:outline-none" />
+          <span className="text-[10px] text-slate-500">in</span>
+        </div>
+      </div>
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Construction</div>
+      <select value={w.mat || DEFAULT_WALL_MAT} onChange={(e) => onMat(w.wid, e.target.value)} className="mt-1 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-2 text-xs text-slate-200 focus:outline-none">
+        {WALL_MATERIALS.map((mm) => <option key={mm.id} value={mm.id}>{mm.label}</option>)}
+      </select>
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Doorway</div>
+      {!op ? (
+        <button onClick={() => onAddOpening(w.wid)} className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-800 py-2 text-xs font-medium text-slate-200 active:bg-slate-700"><DoorOpen className="h-3.5 w-3.5" /> Add doorway</button>
+      ) : (
+        <div className="mt-1 space-y-1.5 rounded-md border border-slate-700 bg-slate-900/40 p-2">
+          <div className="flex items-center gap-1.5">
+            <span className="w-12 shrink-0 text-[10px] text-slate-400">Width</span>
+            <button onClick={() => onSetOpening(w.wid, { w: op.w - 1 })} className={mini}>−</button>
+            <div className="flex flex-1 items-center justify-center gap-1 rounded border border-slate-700 bg-slate-800 py-1"><input type="number" inputMode="numeric" value={Math.round(op.w)} onChange={(e) => onSetOpening(w.wid, { w: +e.target.value || 0 })} className="w-10 bg-transparent text-center text-xs text-slate-100 focus:outline-none" /><span className="text-[10px] text-slate-500">in</span></div>
+            <button onClick={() => onSetOpening(w.wid, { w: op.w + 1 })} className={mini}>+</button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-12 shrink-0 text-[10px] text-slate-400">Height</span>
+            <button onClick={() => onSetOpening(w.wid, { dh: op.dh - 1 })} className={mini}>−</button>
+            <div className="flex flex-1 items-center justify-center gap-1 rounded border border-slate-700 bg-slate-800 py-1"><input type="number" inputMode="numeric" value={Math.round(op.dh)} onChange={(e) => onSetOpening(w.wid, { dh: +e.target.value || 0 })} className="w-10 bg-transparent text-center text-xs text-slate-100 focus:outline-none" /><span className="text-[10px] text-slate-500">in</span></div>
+            <button onClick={() => onSetOpening(w.wid, { dh: op.dh + 1 })} className={mini}>+</button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-12 shrink-0 text-[10px] text-slate-400">Slide</span>
+            <button onClick={() => onSetOpening(w.wid, { off: op.off - 2 })} className={mini}>←</button>
+            <button onClick={() => onSetOpening(w.wid, { off: (len - op.w) / 2 })} className="flex-1 rounded border border-slate-700 bg-slate-800 py-1 text-[10px] text-slate-300 active:bg-slate-700">Center</button>
+            <button onClick={() => onSetOpening(w.wid, { off: op.off + 2 })} className={mini}>→</button>
+          </div>
+          <div className="flex items-center justify-between px-0.5 text-[10px] text-slate-500"><span>{op.dh >= ht ? "Full-height cut-through" : "Header framed above"}</span><button onClick={() => onRemoveOpening(w.wid)} className="flex items-center gap-1 text-red-300/80 hover:text-red-300"><X className="h-3 w-3" /> Remove</button></div>
+        </div>
+      )}
+      <button onClick={() => onRemove(w.wid)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-red-900 bg-red-950/40 py-2 text-xs font-medium text-red-300 active:bg-red-900/40"><Trash2 className="h-3.5 w-3.5" /> Delete wall</button>
+    </div>
+  );
+}
+function WallList({ walls, van, wallMode, selectedWid, onToggle, onSelect, onRemove, onHeight, onMat, onLength, onUndo, onRedo }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Walls{walls.length ? ` (${walls.length})` : ""}</span>
+        <div className="flex items-center gap-1">
+          <button onClick={onUndo} title="Undo wall" className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-slate-300 transition hover:bg-slate-700"><Undo2 className="h-3.5 w-3.5" /></button>
+          <button onClick={onRedo} title="Redo wall" className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-slate-300 transition hover:bg-slate-700"><Redo2 className="h-3.5 w-3.5" /></button>
+          <button onClick={onToggle} className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${wallMode ? "border-blue-500 bg-blue-500/15 text-blue-300" : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"}`}><PenTool className="h-3 w-3" />{wallMode ? "Drawing — tap to stop" : "Draw wall"}</button>
+        </div>
+      </div>
+      {wallMode && <p className="mb-2 rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-blue-200">Press a start point, slide to the end — the guide line snaps straight and shows length live. Lift to set the wall. Endpoints snap to corners &amp; existing walls (dot turns green).</p>}
+      {walls.length === 0 && !wallMode && <p className="rounded-lg border border-dashed border-slate-700 px-3 py-3 text-center text-[11px] text-slate-500">No walls yet — draw a bathroom enclosure or a half-wall divider.</p>}
+      <div className="space-y-1.5">
+        {walls.map((w, i) => {
+          const len = Math.round(wallLenIn(w)), sel = w.wid === selectedWid, custom = typeof w.h === "number";
+          return (
+            <div key={w.wid} className={`rounded-lg border px-2 py-1.5 ${sel ? "border-blue-500 bg-blue-500/10" : "border-slate-800 bg-slate-800/40"}`}>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onSelect(sel ? null : w.wid)} className="flex-1 truncate text-left text-xs font-medium text-slate-200">Wall {i + 1} · {inToFtIn(len)}</button>
+                <button onClick={() => onRemove(w.wid)} title="Delete wall" className="text-slate-500 transition hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+              <div className="mt-1.5 flex items-center gap-1">
+                <span className="w-7 text-[10px] uppercase tracking-wide text-slate-500">Len</span>
+                <button onClick={() => onLength(w.wid, len - 1)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700">−</button>
+                <div className="flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-1.5">
+                  <input type="number" inputMode="numeric" value={len} onChange={(e) => onLength(w.wid, Math.max(3, Math.round(+e.target.value || 0)))} className="w-9 bg-transparent py-1 text-center text-[11px] text-slate-200 focus:outline-none" />
+                  <span className="text-[10px] text-slate-500">in</span>
+                </div>
+                <button onClick={() => onLength(w.wid, len + 1)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700">+</button>
+                <span className="ml-auto text-[10px] text-slate-500">{inToFtIn(len)}</span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-1">
+                <span className="w-7 text-[10px] uppercase tracking-wide text-slate-500">Ht</span>
+                {[["full", "Full"], ["half", "Half"]].map(([v, lab]) => (
+                  <button key={v} onClick={() => onHeight(w.wid, v)} className={`flex-1 rounded border px-1.5 py-1 text-[11px] transition ${w.h === v ? "border-blue-500 bg-blue-500/15 text-blue-200" : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"}`}>{lab}</button>
+                ))}
+                <div className={`flex flex-1 items-center gap-1 rounded border px-1.5 ${custom ? "border-blue-500 bg-blue-500/15" : "border-slate-700 bg-slate-800"}`}>
+                  <input type="number" inputMode="numeric" value={custom ? w.h : ""} placeholder="in" onChange={(e) => { const v = e.target.value; onHeight(w.wid, v === "" ? "half" : Math.max(4, Math.min(van.roofH || 96, Math.round(+v) || 0))); }} className="w-full bg-transparent py-1 text-[11px] text-slate-200 placeholder:text-slate-500 focus:outline-none" />
+                  <span className="text-[10px] text-slate-500">in</span>
+                </div>
+              </div>
+              <div className="mt-1.5 flex items-center gap-1">
+                <span className="w-7 text-[10px] uppercase tracking-wide text-slate-500">Mat</span>
+                <select value={w.mat || DEFAULT_WALL_MAT} onChange={(e) => onMat(w.wid, e.target.value)} className="flex-1 rounded border border-slate-700 bg-slate-800 px-1.5 py-1 text-[11px] text-slate-200 focus:outline-none">
+                  {WALL_MATERIALS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 function ComponentsList({ items, selectedIid, onSelect, onHide, onRemove, onShowAll, onInfo }) {
   if (!items.length) return <div className="rounded-md border border-dashed border-slate-700 px-3 py-4 text-center text-xs text-slate-500">Add parts and they'll be listed here to show, hide, or remove.</div>;
   const hiddenCount = items.filter((it) => it.hidden).length;
@@ -2668,7 +2909,10 @@ function Selectish({ value, onChange, options }) {
 }
 
 /* ---- floor plan ---------------------------------------------------------- */
-function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, scale = PX_PER_IN, showDims = true, guides = [], dragIid = null }) {
+function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, scale = PX_PER_IN, showDims = true, guides = [], dragIid = null, walls = [], wallMode = false, selectedWid = null, onAddWall = () => {}, onSelectWall = () => {}, onMoveNode = () => {} }) {
+  const [wallDraft, setWallDraft] = useState(null);
+  const wallStartRef = useRef(null), wallEndRef = useRef(null), nodeRef = useRef(null);
+  useEffect(() => { if (!wallMode) { setWallDraft(null); wallStartRef.current = null; wallEndRef.current = null; } }, [wallMode]);
   const PX_PER_IN = scale;
   const bs = brandShell(van.make);
   const W = van.intWidth * PX_PER_IN, L = van.intLength * PX_PER_IN, gridStep = 12 * PX_PER_IN;
@@ -2806,7 +3050,89 @@ function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, 
         </svg>
 
         {/* ---- interactive cargo area (placeable parts live here) ---- */}
-        <div ref={canvasRef} onPointerDown={() => onSelect(null)} className="absolute touch-none overflow-hidden" style={{ left: 0, top: cabH, width: W, height: L }}>
+        <div ref={canvasRef}
+          onPointerDown={(e) => {
+            if (!wallMode) { onSelect(null); return; }
+            try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+            const r = e.currentTarget.getBoundingClientRect();
+            const s = wallSnapStart((e.clientX - r.left) / PX_PER_IN, (e.clientY - r.top) / PX_PER_IN, van, walls);
+            wallStartRef.current = s; wallEndRef.current = s; setWallDraft({ x1: s.x, y1: s.y, x2: s.x, y2: s.y, snap: null });
+          }}
+          onPointerMove={(e) => {
+            if (!wallMode || !wallStartRef.current) return;
+            const r = e.currentTarget.getBoundingClientRect(); const s = wallStartRef.current;
+            const en = wallSnapEnd(s.x, s.y, (e.clientX - r.left) / PX_PER_IN, (e.clientY - r.top) / PX_PER_IN, van, walls);
+            wallEndRef.current = en; setWallDraft({ x1: s.x, y1: s.y, x2: en.x, y2: en.y, snap: en.snap });
+          }}
+          onPointerUp={() => {
+            const s = wallStartRef.current, en = wallEndRef.current; wallStartRef.current = null; wallEndRef.current = null;
+            if (s && en && Math.hypot(en.x - s.x, en.y - s.y) >= 3) onAddWall({ x1: s.x, y1: s.y, x2: en.x, y2: en.y });
+            setWallDraft(null);
+          }}
+          onPointerCancel={() => { wallStartRef.current = null; wallEndRef.current = null; setWallDraft(null); }}
+          className={`absolute touch-none overflow-hidden ${wallMode ? "cursor-crosshair" : ""}`} style={{ left: 0, top: cabH, width: W, height: L }}>
+          {(walls.length > 0 || wallDraft) && (
+            <svg className="pointer-events-none absolute inset-0" width={W} height={L} style={{ overflow: "visible" }}>
+              {walls.map((w) => {
+                const sel = w.wid === selectedWid, full = w.h === "full", sw = Math.max(4, wallThickIn(w) * PX_PER_IN);
+                const mx = (w.x1 + w.x2) / 2 * PX_PER_IN, my = (w.y1 + w.y2) / 2 * PX_PER_IN, ln = Math.round(wallLenIn(w));
+                const wlen = wallLenIn(w) || 1, uxw = (w.x2 - w.x1) / wlen, uyw = (w.y2 - w.y1) / wlen;
+                const P = (d) => [(w.x1 + uxw * d) * PX_PER_IN, (w.y1 + uyw * d) * PX_PER_IN];
+                const op = (w.openings && w.openings[0]) || null;
+                let oS = null, oE = null, jPx = -uyw, jPy = uxw, leaf = null, sweep = 1;
+                if (op) {
+                  const s = Math.max(0, Math.min(wlen, op.off)), e = Math.max(s, Math.min(wlen, op.off + op.w));
+                  oS = P(s); oE = P(e);
+                  const midx = w.x1 + uxw * ((s + e) / 2), midy = w.y1 + uyw * ((s + e) / 2);
+                  const sign = (jPx * (van.intWidth / 2 - midx) + jPy * (van.intLength / 2 - midy)) >= 0 ? 1 : -1;
+                  leaf = [(w.x1 + uxw * s + jPx * sign * op.w) * PX_PER_IN, (w.y1 + uyw * s + jPy * sign * op.w) * PX_PER_IN];
+                  sweep = ((oE[0] - oS[0]) * (leaf[1] - oS[1]) - (oE[1] - oS[1]) * (leaf[0] - oS[0])) > 0 ? 1 : 0;
+                }
+                const wcol = sel ? "#2563eb" : full ? "#334155" : "#64748b", jh = sw / 2 + 1;
+                return (
+                  <g key={w.wid}>
+                    {!wallMode && <line x1={w.x1 * PX_PER_IN} y1={w.y1 * PX_PER_IN} x2={w.x2 * PX_PER_IN} y2={w.y2 * PX_PER_IN} stroke="transparent" strokeWidth={Math.max(18, sw + 12)} strokeLinecap="round" style={{ pointerEvents: "stroke", cursor: "pointer" }} onPointerDown={(e) => { e.stopPropagation(); onSelectWall(w.wid); }} />}
+                    {!op ? (<>
+                      <line x1={w.x1 * PX_PER_IN} y1={w.y1 * PX_PER_IN} x2={w.x2 * PX_PER_IN} y2={w.y2 * PX_PER_IN} stroke={wcol} strokeWidth={sw} strokeLinecap="round" opacity={full ? 0.95 : 0.85} />
+                      {!full && <line x1={w.x1 * PX_PER_IN} y1={w.y1 * PX_PER_IN} x2={w.x2 * PX_PER_IN} y2={w.y2 * PX_PER_IN} stroke="#e2e8f0" strokeWidth={1.5} strokeDasharray="5 4" />}
+                    </>) : (<>
+                      <line x1={P(0)[0]} y1={P(0)[1]} x2={oS[0]} y2={oS[1]} stroke={wcol} strokeWidth={sw} strokeLinecap="round" opacity={full ? 0.95 : 0.85} />
+                      <line x1={oE[0]} y1={oE[1]} x2={P(wlen)[0]} y2={P(wlen)[1]} stroke={wcol} strokeWidth={sw} strokeLinecap="round" opacity={full ? 0.95 : 0.85} />
+                      <line x1={oS[0] + jPx * jh} y1={oS[1] + jPy * jh} x2={oS[0] - jPx * jh} y2={oS[1] - jPy * jh} stroke={wcol} strokeWidth={1.5} />
+                      <line x1={oE[0] + jPx * jh} y1={oE[1] + jPy * jh} x2={oE[0] - jPx * jh} y2={oE[1] - jPy * jh} stroke={wcol} strokeWidth={1.5} />
+                      <line x1={oS[0]} y1={oS[1]} x2={leaf[0]} y2={leaf[1]} stroke="#2563eb" strokeWidth={2} opacity={0.85} />
+                      <path d={`M ${oE[0]} ${oE[1]} A ${op.w * PX_PER_IN} ${op.w * PX_PER_IN} 0 0 ${sweep} ${leaf[0]} ${leaf[1]}`} fill="none" stroke="#2563eb" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.6} />
+                    </>)}
+                    <circle cx={w.x1 * PX_PER_IN} cy={w.y1 * PX_PER_IN} r={3} fill={sel ? "#2563eb" : "#475569"} />
+                    <circle cx={w.x2 * PX_PER_IN} cy={w.y2 * PX_PER_IN} r={3} fill={sel ? "#2563eb" : "#475569"} />
+                    {!wallMode && [["1", w.x1, w.y1], ["2", w.x2, w.y2]].map(([k, ix, iy]) => (
+                      <g key={k}>
+                        {sel && <circle cx={ix * PX_PER_IN} cy={iy * PX_PER_IN} r={6} fill="#2563eb" stroke="#fff" strokeWidth={2} />}
+                        <circle cx={ix * PX_PER_IN} cy={iy * PX_PER_IN} r={13} fill="transparent" style={{ pointerEvents: "all", cursor: "grab", touchAction: "none" }}
+                          onPointerDown={(e) => { e.stopPropagation(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} nodeRef.current = { ox: ix, oy: iy }; onSelectWall(w.wid); }}
+                          onPointerMove={(e) => { if (!nodeRef.current || !canvasRef.current) return; const r = canvasRef.current.getBoundingClientRect(); const sn = wallSnapStart((e.clientX - r.left) / PX_PER_IN, (e.clientY - r.top) / PX_PER_IN, van, walls); onMoveNode(nodeRef.current.ox, nodeRef.current.oy, sn.x, sn.y); nodeRef.current = { ox: sn.x, oy: sn.y }; }}
+                          onPointerUp={(e) => { nodeRef.current = null; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {} }}
+                          onPointerCancel={() => { nodeRef.current = null; }} />
+                      </g>
+                    ))}
+                    {sel && <g transform={`translate(${mx}, ${my - 9})`}><rect x={-24} y={-9} width={48} height={15} rx={3} fill="#1d4ed8" /><text x={0} y={0} textAnchor="middle" dominantBaseline="middle" fontSize="10" fontWeight="700" fill="#fff">{ln}"</text></g>}
+                  </g>
+                );
+              })}
+              {wallDraft && (() => {
+                const len = Math.hypot(wallDraft.x2 - wallDraft.x1, wallDraft.y2 - wallDraft.y1);
+                const mx = (wallDraft.x1 + wallDraft.x2) / 2 * PX_PER_IN, my = (wallDraft.y1 + wallDraft.y2) / 2 * PX_PER_IN;
+                return (
+                  <g>
+                    <line x1={wallDraft.x1 * PX_PER_IN} y1={wallDraft.y1 * PX_PER_IN} x2={wallDraft.x2 * PX_PER_IN} y2={wallDraft.y2 * PX_PER_IN} stroke="#2563eb" strokeWidth={6} strokeLinecap="round" strokeDasharray="7 5" opacity={0.92} />
+                    <circle cx={wallDraft.x1 * PX_PER_IN} cy={wallDraft.y1 * PX_PER_IN} r={5} fill="#2563eb" stroke="#fff" strokeWidth={2} />
+                    <circle cx={wallDraft.x2 * PX_PER_IN} cy={wallDraft.y2 * PX_PER_IN} r={5} fill={wallDraft.snap === "point" ? "#22c55e" : "#2563eb"} stroke="#fff" strokeWidth={2} />
+                    {len >= 1 && <g transform={`translate(${mx}, ${my - 11})`}><rect x={-28} y={-11} width={56} height={17} rx={3} fill="#0f172a" opacity={0.95} /><text x={0} y={0} textAnchor="middle" dominantBaseline="middle" fontSize="11" fontWeight="700" fill="#fff">{Math.round(len)}"</text></g>}
+                  </g>
+                );
+              })()}
+            </svg>
+          )}
           {items.filter((it) => !it.rack && !it.elec && !it.plumb && !it.shower && it.c.system !== "material" && it.c.category !== "Window" && it.c.category !== "Flare" && !(it.c.category === "Lighting" && it.c.system === "exterior") && it.c.category !== "Lighting Bracket" && it.c.category !== "Roof Rack").map((it) => {
             const c = it.c;
             const w = it.w * PX_PER_IN, h = it.l * PX_PER_IN;
@@ -2816,7 +3142,7 @@ function FloorPlan({ van, items, selectedIid, canvasRef, onStartMove, onSelect, 
             const big = !it.hidden && h > 40 && w > 52;
             return (
               <div key={it.iid} onPointerDown={(e) => onStartMove(it.iid, e)} title={c.name}
-                className={`group touch-none absolute flex ${it.locked ? "cursor-default" : "cursor-grab active:cursor-grabbing"} flex-col items-center justify-center overflow-hidden rounded text-center shadow-sm transition-shadow ${
+                className={`group touch-none absolute flex ${wallMode ? "pointer-events-none" : ""} ${it.locked ? "cursor-default" : "cursor-grab active:cursor-grabbing"} flex-col items-center justify-center overflow-hidden rounded text-center shadow-sm transition-shadow ${
                   it.outside ? "border-2 border-red-500 bg-red-500/25" : it.tooTall ? "border-2 border-amber-500 bg-amber-400/30" : it.onWell ? "border-2 border-orange-500 bg-orange-400/30" : "border-2 " + (FILL_LIGHT[c.color] || "border-slate-500 bg-slate-400/30")
                 } ${!c.placeable ? "border-dashed" : ""} ${it.hidden ? "opacity-30" : ""} ${sel ? "z-10 ring-2 ring-blue-600 ring-offset-2 ring-offset-amber-50" : "z-0"}`}
                 style={{ left: bx, top: by, width: bw, height: bh, touchAction: "none" }}>
@@ -2940,7 +3266,7 @@ function DragLoupe({ van, items, dragIid, guides, pt }) {
     </div>
   );
 }
-function Iso3D({ van, items, rot = 0 }) {
+function Iso3D({ van, items, walls = [], rot = 0 }) {
   const Wd = van.intWidth, Ln = van.intLength, Hr = van.roofH || 76;
   const ISO = 2.2, COS = 0.8660254, SIN = 0.5, ZK = 0.92;
   const cxr = Wd / 2, cyr = Ln / 2, a = ((((rot % 4) + 4) % 4)) * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
@@ -2960,7 +3286,7 @@ function Iso3D({ van, items, rot = 0 }) {
   for (let g = 12; g < Ln; g += 12) grid.push(seg([0, g, 0], [Wd, g, 0]));
   const boxes = items.filter(keep).map((it) => {
     const x0 = it.x, y0 = it.y, x1 = it.x + it.w, y1 = it.y + it.l, h = Math.max(it.hIn || 18, 1);
-    const zb = it.c.overhead ? Math.max(0, (van.roofH || 76) - h) : 0, zt = zb + h;
+    const zb = it.c.overhead ? Math.max(0, (van.roofH || 76) - h) : Math.max(0, it.elevIn || 0), zt = zb + h;
     const base = COLOR_HEX[it.c.color] || "#64748b";
     const sides = [
       { k: "yA", p: [[x0,y0,zb],[x1,y0,zb],[x1,y0,zt],[x0,y0,zt]], d: dep((x0 + x1) / 2, y0), c: shade(base, 0.78) },
@@ -2970,20 +3296,41 @@ function Iso3D({ van, items, rot = 0 }) {
     ].sort((m, n) => m.d - n.d);
     return { iid: it.iid, d: dep((x0 + x1) / 2, (y0 + y1) / 2), zb, overhead: !!it.c.overhead, foot: [[x0,y0,0],[x1,y0,0],[x1,y1,0],[x0,y1,0]], drops: [[[x0,y0,0],[x0,y0,zb]],[[x1,y0,0],[x1,y0,zb]],[[x1,y1,0],[x1,y1,zb]],[[x0,y1,0],[x0,y1,zb]]], sides, top: { p: [[x0,y0,zt],[x1,y0,zt],[x1,y1,zt],[x0,y1,zt]], c: base } };
   }).sort((m, n) => (m.d - n.d) || (m.zb - n.zb));
-  const empty = items.filter(keep).length === 0;
+  const wallBoxes = (walls || []).flatMap((w) => {
+    const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1) || 1;
+    const ux = (w.x2 - w.x1) / len, uy = (w.y2 - w.y1) / len, px = -uy, py = ux;
+    const ht = Math.max(1.5, wallThickIn(w)) / 2, h = wallHeightIn(w, van.roofH);
+    const base = w.h === "full" ? "#9aa6b6" : "#aebacb";
+    const mk = (ax, ay, bx, by, zlo, zhi, tag) => {
+      const A = [ax + px * ht, ay + py * ht], B = [bx + px * ht, by + py * ht], C = [bx - px * ht, by - py * ht], D = [ax - px * ht, ay - py * ht];
+      const face = (p1, p2, nX, nY) => ({ k: tag + p1[0].toFixed(1) + "_" + p2[1].toFixed(1), p: [[p1[0], p1[1], zlo], [p2[0], p2[1], zlo], [p2[0], p2[1], zhi], [p1[0], p1[1], zhi]], d: dep((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2), c: shade(base, Math.abs(nY) >= Math.abs(nX) ? 0.82 : 0.62) });
+      const sides = [face(A, B, px, py), face(B, C, ux, uy), face(C, D, -px, -py), face(D, A, -ux, -uy)].sort((m, n) => m.d - n.d);
+      return { iid: "wall-" + w.wid + tag, d: dep((ax + bx) / 2, (ay + by) / 2), zb: zlo, overhead: false, sides, top: { p: [[A[0], A[1], zhi], [B[0], B[1], zhi], [C[0], C[1], zhi], [D[0], D[1], zhi]], c: base } };
+    };
+    const op = (w.openings && w.openings[0]) || null;
+    if (!op || !(op.w > 0)) return [mk(w.x1, w.y1, w.x2, w.y2, 0, h, "")];
+    const s = Math.max(0, Math.min(len, op.off)), e = Math.max(s, Math.min(len, op.off + op.w)), dh = Math.min(h, Math.max(0, op.dh || 0));
+    const sx = w.x1 + ux * s, sy = w.y1 + uy * s, ex = w.x1 + ux * e, ey = w.y1 + uy * e, out = [];
+    if (s > 0.5) out.push(mk(w.x1, w.y1, sx, sy, 0, h, "L"));
+    if (e < len - 0.5) out.push(mk(ex, ey, w.x2, w.y2, 0, h, "R"));
+    if (dh < h - 0.5 && e > s + 0.5) out.push(mk(sx, sy, ex, ey, dh, h, "H"));
+    return out;
+  });
+  const allBoxes = [...boxes, ...wallBoxes].sort((m, n) => (m.d - n.d) || ((m.zb || 0) - (n.zb || 0)));
+  const empty = items.filter(keep).length === 0 && (!walls || walls.length === 0);
   return (
     <svg width={VW} height={VH} viewBox={"0 0 " + VW + " " + VH} style={{ maxWidth: "100%", height: "auto" }}>
       <polygon points={ptsStr([[0,0,0],[Wd,0,0],[Wd,Ln,0],[0,Ln,0]])} fill="#c7a87a" stroke="#8a7350" strokeWidth="1.5" />
       {grid.map((g, i) => (<line key={"g" + i} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke="#00000018" strokeWidth="1" />))}
       {[[0,0],[Wd,0],[Wd,Ln],[0,Ln]].map((cc, i) => { const sgm = seg([cc[0], cc[1], 0], [cc[0], cc[1], Hr]); return (<line key={"v" + i} x1={sgm.x1} y1={sgm.y1} x2={sgm.x2} y2={sgm.y2} stroke="#475569" strokeWidth="1" opacity="0.4" />); })}
       <polyline points={ptsStr([[0,0,Hr],[Wd,0,Hr],[Wd,Ln,Hr],[0,Ln,Hr],[0,0,Hr]])} fill="none" stroke="#475569" strokeWidth="1" strokeDasharray="5 4" opacity="0.5" />
-      {boxes.filter((b) => b.overhead).map((b) => (
+      {boxes.filter((b) => b.zb > 0.5).map((b) => (
         <g key={"sh" + b.iid}>
           <polygon points={ptsStr(b.foot)} fill="#1d4ed8" fillOpacity="0.14" stroke="#1d4ed8" strokeOpacity="0.7" strokeWidth="1.25" strokeDasharray="4 3" />
           {b.drops.map((d, i) => { const dl = seg(d[0], d[1]); return (<line key={"dp" + i} x1={dl.x1} y1={dl.y1} x2={dl.x2} y2={dl.y2} stroke="#1d4ed8" strokeOpacity="0.55" strokeWidth="1" strokeDasharray="3 3" />); })}
         </g>
       ))}
-      {boxes.map((b) => (
+      {allBoxes.map((b) => (
         <g key={b.iid}>
           {b.sides.map((f) => (<polygon key={f.k} points={ptsStr(f.p)} fill={f.c} stroke="#0f172a" strokeOpacity="0.25" strokeWidth="0.75" />))}
           <polygon points={ptsStr(b.top.p)} fill={b.top.c} stroke="#0f172a" strokeOpacity="0.4" strokeWidth="0.75" />
@@ -2993,7 +3340,28 @@ function Iso3D({ van, items, rot = 0 }) {
     </svg>
   );
 }
-function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize, onLock }) {
+function ElevEditor({ it, onElev }) {
+  const v = Math.max(0, it.elevIn || 0), set = (n) => onElev(it.iid, Math.max(0, n));
+  const btn = "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-lg text-slate-200 active:bg-slate-700";
+  return (
+    <div>
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => set(v - 1)} className={btn}>−</button>
+        <div className="flex flex-1 items-center justify-center gap-1 rounded-md border border-slate-700 bg-slate-900/60 py-1.5">
+          <input type="number" inputMode="numeric" value={v} onChange={(e) => set(Math.round(+e.target.value || 0))} className="w-12 bg-transparent text-center text-sm font-semibold text-slate-100 focus:outline-none" />
+          <span className="text-xs text-slate-500">in off floor{v > 0 ? ` · ${inToFtIn(v)}` : ""}</span>
+        </div>
+        <button onClick={() => set(v + 1)} className={btn}>+</button>
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {[["Floor", 0], ['Bench 18"', 18], ['Platform 30"', 30], ['Loft 42"', 42]].map(([lab, n]) => (
+          <button key={lab} onClick={() => set(n)} className={`rounded-full border px-2 py-1 text-[10px] transition ${v === n ? "border-blue-500 bg-blue-500/15 text-blue-200" : "border-slate-700 bg-slate-800 text-slate-300 active:bg-slate-700"}`}>{lab}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize, onLock, onElev }) {
   const c = it.c, Icon = c.icon, ew = elecWarnings(c);
   const elecMeaningful = c.system === "electrical" || !!(c.elec && (c.elec.contAmps != null || c.elec.maxAmps != null || c.elec.surgeWatts != null || c.elec.inverterW != null || c.elec.runWatts != null || c.elec.fuse != null || c.elec.wireGauge));
   const missingShown = c.missing.filter((m) => elecMeaningful || !String(m).startsWith("electrical"));
@@ -3011,7 +3379,7 @@ function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize, onLo
       </div>
 
       {it.outside && <Flag tone="red" icon={AlertTriangle} text="Outside van boundary" />}
-      {!it.outside && it.tooTall && <Flag tone="amber" icon={ArrowUp} text={`Taller than roof (${c.height}" > ${van.roofH}")`} />}
+      {!it.outside && it.tooTall && <Flag tone="amber" icon={ArrowUp} text={it.elevIn > 0 ? `Raised ${it.elevIn}" + ${Math.round(it.hIn)}" tall = ${Math.round(it.elevIn + it.hIn)}" > roof ${van.roofH}"` : `Taller than roof (${Math.round(it.hIn)}" > ${van.roofH}")`} />}
       {!it.outside && it.onWell && <Flag tone="orange" icon={AlertTriangle} text="Sits over a wheel well" />}
       {!c.placeable && <Flag tone="amber" icon={AlertTriangle} text="No dimensions in DB — default footprint shown" />}
       {missingShown.length > 0 && <Flag tone="amber" icon={AlertTriangle} text={`Missing in DB: ${missingShown.map((m) => FIELD_LABEL[m] || m).join(", ")}`} />}
@@ -3034,6 +3402,10 @@ function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize, onLo
 
       <div className="mt-3 text-[10px] uppercase tracking-widest text-slate-500">Size — adjust to fit</div>
       <div className="mt-1.5"><SizeEditor it={it} onResize={onResize} /></div>
+      {c.system !== "material" && (<>
+        <div className="mt-3 text-[10px] uppercase tracking-widest text-slate-500">Height off floor — platform / bunk / shelf</div>
+        <div className="mt-1.5"><ElevEditor it={it} onElev={onElev} /></div>
+      </>)}
     </div>
   );
 }
