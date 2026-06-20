@@ -465,6 +465,25 @@ function wallSnapEnd(sx, sy, x, y, van, walls) {
   if (Math.abs(ey) < 3) ey = 0; else if (Math.abs(ey - van.intLength) < 3) ey = van.intLength;
   return { x: Math.max(0, Math.min(van.intWidth, Math.round(ex))), y: Math.max(0, Math.min(van.intLength, Math.round(ey))), snap: locked ? "axis" : null };
 }
+function doorwayBlocked(it, walls) {
+  for (const w of (walls || [])) {
+    const ops = w.openings || []; if (!ops.length) continue;
+    const dx = Math.abs(w.x2 - w.x1), dy = Math.abs(w.y2 - w.y1), len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1) || 1;
+    const ux = (w.x2 - w.x1) / len, uy = (w.y2 - w.y1) / len, clr = Math.max(1.5, wallThickIn(w)) / 2 + 10;
+    for (const o of ops) {
+      if (!o || !(o.w > 0)) continue;
+      const s = Math.max(0, Math.min(len, o.off)), e = Math.max(s, Math.min(len, o.off + o.w));
+      if (dx < 1.5 && dy >= 1.5) {
+        const wx = (w.x1 + w.x2) / 2, ya = Math.min(w.y1 + uy * s, w.y1 + uy * e), yb = Math.max(w.y1 + uy * s, w.y1 + uy * e);
+        if (Math.min(it.x + it.w, wx + clr) - Math.max(it.x, wx - clr) > 2 && Math.min(it.y + it.l, yb) - Math.max(it.y, ya) > 2) return true;
+      } else if (dy < 1.5 && dx >= 1.5) {
+        const wy = (w.y1 + w.y2) / 2, xa = Math.min(w.x1 + ux * s, w.x1 + ux * e), xb = Math.max(w.x1 + ux * s, w.x1 + ux * e);
+        if (Math.min(it.x + it.w, xb) - Math.max(it.x, xa) > 2 && Math.min(it.y + it.l, wy + clr) - Math.max(it.y, wy - clr) > 2) return true;
+      }
+    }
+  }
+  return false;
+}
 const isAC = (v) => v === "120V" || v === "240V";
 function titleCase(s) { return (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 const fp = (c) => ({ w: c.width ?? DEF_W, l: c.length ?? DEF_L, h: c.height ?? DEF_H });
@@ -814,6 +833,7 @@ function MobileSheet({ it, van, pos, setPos, tab, setTab, onClose, onRotate, onH
                   {it.outside && <Flag tone="red" icon={AlertTriangle} text="Outside van boundary" />}
                   {!it.outside && it.tooTall && <Flag tone="amber" icon={ArrowUp} text={it.elevIn > 0 ? `Raised ${it.elevIn}" + ${Math.round(it.hIn)}" tall = ${Math.round(it.elevIn + it.hIn)}" > roof ${van.roofH}"` : `Taller than roof (${Math.round(it.hIn)}" > ${van.roofH}")`} />}
                   {!it.outside && it.onWell && <Flag tone="orange" icon={AlertTriangle} text="Sits over a wheel well" />}
+                  {!it.outside && it.blocksDoor && <Flag tone="orange" icon={DoorOpen} text="Blocks a doorway - move it clear of the opening" />}
                   {c.missing.length > 0 && <Flag tone="amber" icon={AlertTriangle} text={`Missing in DB: ${c.missing.map((m) => FIELD_LABEL[m] || m).join(", ")}`} />}
                   <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
                     <Spec k="Width" v={c.width != null ? `${c.width}"` : "—"} danger={c.width == null} />
@@ -1137,10 +1157,11 @@ export default function App() {
       const elevIn = Math.max(0, p.elevIn || 0);
       const outside = !isMat && (p.x < 0 || p.y < 0 || p.x + w > van.intWidth || p.y + l > van.intLength);
       const onWell = !isMat && overWell({ ...p, c }, van);
+      const blocksDoor = !isMat && doorwayBlocked({ x: p.x, y: p.y, w, l }, walls);
       const fr = c.system === "cabinetry" ? FRAMING_FACTOR[framing] : null;
       const weightAdj = c.weight != null ? c.weight * (fr ? fr.w : 1) : null;
       const costAdj = c.cost != null ? c.cost * (fr ? fr.c : 1) : null;
-      return { ...p, c, w, l, hIn, elevIn, outside, onWell, weightAdj, costAdj };
+      return { ...p, c, w, l, hIn, elevIn, outside, onWell, blocksDoor, weightAdj, costAdj };
     });
     return base.map((it) => {
       // mattress auto-rests on top of the tallest cabinet/platform beneath it
@@ -1160,7 +1181,7 @@ export default function App() {
       const tooTall = it.c.system !== "material" && it.hIn != null && van.roofH != null && (it.elevIn + it.hIn) > van.roofH;
       return { ...it, tooTall };
     });
-  }, [placed, van, framing]);
+  }, [placed, van, framing, walls]);
 
   const stats = useMemo(() => {
     let dry = 0, cost = 0, driver = 0, pass = 0, freshGal = 0, grayGal = 0, unknownWt = 0;
@@ -3377,7 +3398,14 @@ function Iso3D({ van, items, walls = [], rot = 0 }) {
     if (dh < h - 0.5 && e > s + 0.5) out.push(mk(sx, sy, ex, ey, dh, h, "H"));
     return out;
   });
-  const allBoxes = [...boxes, ...wallBoxes].sort((m, n) => (m.d - n.d) || ((m.zb || 0) - (n.zb || 0)));
+  const DZ = 2 * SIN / ZK; // height's weight in true camera-depth for this iso projection
+  const faceKey = (p) => { let cx = 0, cy = 0, cz = 0; for (const pt of p) { cx += pt[0]; cy += pt[1]; cz += pt[2]; } const n = p.length; return dep(cx / n, cy / n) + (cz / n) * DZ; };
+  const allFaces = [];
+  [...boxes, ...wallBoxes].forEach((b) => {
+    b.sides.forEach((f) => allFaces.push({ key: b.iid + f.k, p: f.p, c: f.c, s: faceKey(f.p), so: 0.25 }));
+    allFaces.push({ key: b.iid + "_top", p: b.top.p, c: b.top.c, s: faceKey(b.top.p), so: 0.4 });
+  });
+  allFaces.sort((m, n) => m.s - n.s);
   const empty = items.filter(keep).length === 0 && (!walls || walls.length === 0);
   return (
     <svg width={VW} height={VH} viewBox={"0 0 " + VW + " " + VH} style={{ maxWidth: "100%", height: "auto" }}>
@@ -3391,12 +3419,7 @@ function Iso3D({ van, items, walls = [], rot = 0 }) {
           {b.drops.map((d, i) => { const dl = seg(d[0], d[1]); return (<line key={"dp" + i} x1={dl.x1} y1={dl.y1} x2={dl.x2} y2={dl.y2} stroke="#1d4ed8" strokeOpacity="0.55" strokeWidth="1" strokeDasharray="3 3" />); })}
         </g>
       ))}
-      {allBoxes.map((b) => (
-        <g key={b.iid}>
-          {b.sides.map((f) => (<polygon key={f.k} points={ptsStr(f.p)} fill={f.c} stroke="#0f172a" strokeOpacity="0.25" strokeWidth="0.75" />))}
-          <polygon points={ptsStr(b.top.p)} fill={b.top.c} stroke="#0f172a" strokeOpacity="0.4" strokeWidth="0.75" />
-        </g>
-      ))}
+      {allFaces.map((f, i) => (<polygon key={f.key + "_" + i} points={ptsStr(f.p)} fill={f.c} stroke="#0f172a" strokeOpacity={f.so} strokeWidth="0.75" />))}
       {empty && <text x={VW / 2} y={VH / 2} textAnchor="middle" fontSize="11" fill="#64748b">Add parts in 2D — they'll appear here</text>}
     </svg>
   );
@@ -3442,6 +3465,7 @@ function Properties({ it, van, onRemove, onRotate, onDup, onHide, onResize, onLo
       {it.outside && <Flag tone="red" icon={AlertTriangle} text="Outside van boundary" />}
       {!it.outside && it.tooTall && <Flag tone="amber" icon={ArrowUp} text={it.elevIn > 0 ? `Raised ${it.elevIn}" + ${Math.round(it.hIn)}" tall = ${Math.round(it.elevIn + it.hIn)}" > roof ${van.roofH}"` : `Taller than roof (${Math.round(it.hIn)}" > ${van.roofH}")`} />}
       {!it.outside && it.onWell && <Flag tone="orange" icon={AlertTriangle} text="Sits over a wheel well" />}
+                  {!it.outside && it.blocksDoor && <Flag tone="orange" icon={DoorOpen} text="Blocks a doorway - move it clear of the opening" />}
       {!c.placeable && <Flag tone="amber" icon={AlertTriangle} text="No dimensions in DB — default footprint shown" />}
       {missingShown.length > 0 && <Flag tone="amber" icon={AlertTriangle} text={`Missing in DB: ${missingShown.map((m) => FIELD_LABEL[m] || m).join(", ")}`} />}
       {!c.verified && missingShown.length === 0 && <Flag tone="amber" icon={Info} text="Not human-verified yet" />}
